@@ -1,5 +1,5 @@
 /**
- * VR Browser - Phase 4: iPhone Safari 最適化
+ * VR Browser - Phase 5: ジャイロ視点移動（DeviceOrientation API）
  */
 
 // DOM要素の取得
@@ -11,8 +11,12 @@ const fileInput = document.getElementById('fileInput');
 // VR関連要素の取得
 const vrButton = document.getElementById('vrButton');
 const exitVrButton = document.getElementById('exitVrButton');
+const resetViewButton = document.getElementById('resetViewButton');
+const vrStatusBadge = document.getElementById('vrStatusBadge');
 const vrContainer = document.getElementById('vrContainer');
 const vrUiLayer = document.getElementById('vrUiLayer');
+const screenLeft = document.getElementById('screenLeft');
+const screenRight = document.getElementById('screenRight');
 const canvasLeft = document.getElementById('canvasLeft');
 const canvasRight = document.getElementById('canvasRight');
 const indicatorLeft = document.getElementById('indicatorLeft');
@@ -28,10 +32,32 @@ let animationFrameId = null;
 let uiFadeTimeout = null;
 let indicatorTimeout = null;
 
+// ============================================================
+// Phase 5: ジャイロ・視点移動 状態変数
+// ============================================================
+let isGyroActive = false;
+let hasCalibrated = false;
+const initialOrientation = { alpha: 0, beta: 0, gamma: 0 };
+const targetOffset = { x: 0, y: 0 };
+const currentOffset = { x: 0, y: 0 };
+
+// 視点移動のチューニングパラメータ
+const SENSITIVITY_X = 6.0;   // 左右の感度（度あたりのピクセル移動量）
+const SENSITIVITY_Y = 5.0;   // 上下の感度
+const MAX_OFFSET_X = 200;    // 左右の最大移動制限（px）
+const MAX_OFFSET_Y = 140;    // 上下の最大移動制限（px）
+const LERP_FACTOR = 0.14;    // スムージング補間係数（手ブレ吸収・滑らかさ）
+
+// PCテスト用（マウスドラッグ視点移動）
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let lastTapTime = 0;
+
 /**
  * ステータスメッセージを更新する関数
  * @param {string} message - 表示するメッセージ
- * @param {'info' | 'warning' | 'success'} type - メッセージの種類（スタイル切り替え用）
+ * @param {'info' | 'warning' | 'success'} type - メッセージの種類
  */
 function updateStatus(message, type = 'info') {
   statusText.textContent = message;
@@ -39,8 +65,22 @@ function updateStatus(message, type = 'info') {
 }
 
 /**
+ * センサーステータスバッジの更新
+ */
+function updateGyroBadge(active, message) {
+  if (vrStatusBadge) {
+    if (active) {
+      vrStatusBadge.textContent = message || '🧭 ジャイロ視点連動中';
+      vrStatusBadge.className = 'vr-status-badge active';
+    } else {
+      vrStatusBadge.textContent = message || '⚠️ センサー無効（固定視点）';
+      vrStatusBadge.className = 'vr-status-badge disabled';
+    }
+  }
+}
+
+/**
  * Canvas の内部解像度を動画の本来のネイティブ解像度に合わせる関数
- * ※iPhoneの高DPI（Retina）ディスプレイでも動画本来の最高画質を維持
  */
 function updateCanvasDimensions() {
   const width = videoPlayer.videoWidth || 1280;
@@ -57,27 +97,174 @@ function updateCanvasDimensions() {
 }
 
 /**
- * VRモード時の描画ループ
- * 1つの video 要素からフレームを取得し、左目・右目の両方の Canvas に同時に描画
- * ※iPhone Safariでの描画安定性のため readyState >= HAVE_CURRENT_DATA を確認
+ * 視点（ゼロ点）を正面にリセットする関数
+ */
+function resetView() {
+  hasCalibrated = false;
+  targetOffset.x = 0;
+  targetOffset.y = 0;
+  currentOffset.x = 0;
+  currentOffset.y = 0;
+
+  if (screenLeft && screenRight) {
+    screenLeft.style.transform = 'translate3d(0, 0, 0)';
+    screenRight.style.transform = 'translate3d(0, 0, 0)';
+  }
+
+  // HUDにリセット完了を表示
+  showCenterMessage('🎯 正面リセット');
+  resetUiFadeTimer();
+}
+
+/**
+ * 画面中央に一時的なHUDメッセージを表示
+ */
+function showCenterMessage(text) {
+  indicatorLeft.textContent = text;
+  indicatorRight.textContent = text;
+  indicatorLeft.style.fontSize = '0.9rem';
+  indicatorRight.style.fontSize = '0.9rem';
+  indicatorLeft.style.width = 'auto';
+  indicatorRight.style.width = 'auto';
+  indicatorLeft.style.padding = '8px 16px';
+  indicatorRight.style.padding = '8px 16px';
+  indicatorLeft.style.borderRadius = '20px';
+  indicatorRight.style.borderRadius = '20px';
+
+  indicatorLeft.classList.add('show');
+  indicatorRight.classList.add('show');
+
+  if (indicatorTimeout) clearTimeout(indicatorTimeout);
+  indicatorTimeout = setTimeout(() => {
+    indicatorLeft.classList.remove('show');
+    indicatorRight.classList.remove('show');
+    // 元のアイコンスタイルに戻す
+    setTimeout(() => {
+      indicatorLeft.style.fontSize = '';
+      indicatorRight.style.fontSize = '';
+      indicatorLeft.style.width = '';
+      indicatorRight.style.width = '';
+      indicatorLeft.style.padding = '';
+      indicatorRight.style.padding = '';
+      indicatorLeft.style.borderRadius = '';
+      indicatorRight.style.borderRadius = '';
+    }, 300);
+  }, 900);
+}
+
+/**
+ * 再生 / 一時停止時のHUDインジケーター表示
+ */
+function showPlayPauseIndicator(isPlaying) {
+  const icon = isPlaying ? '▶' : '⏸';
+  indicatorLeft.textContent = icon;
+  indicatorRight.textContent = icon;
+  indicatorLeft.classList.add('show');
+  indicatorRight.classList.add('show');
+
+  if (indicatorTimeout) clearTimeout(indicatorTimeout);
+  indicatorTimeout = setTimeout(() => {
+    indicatorLeft.classList.remove('show');
+    indicatorRight.classList.remove('show');
+  }, 800);
+}
+
+/**
+ * DeviceOrientation イベントハンドラー
+ * 端末の傾き（オイラー角）から左右・上下の視線移動量を計算
+ */
+function handleDeviceOrientation(event) {
+  if (!isVRMode) return;
+
+  const { alpha, beta, gamma } = event;
+  if (beta === null || gamma === null) return;
+
+  // 初回受信時に基準位置（正面）としてキャリブレーション
+  if (!hasCalibrated) {
+    initialOrientation.alpha = alpha || 0;
+    initialOrientation.beta = beta;
+    initialOrientation.gamma = gamma;
+    hasCalibrated = true;
+    isGyroActive = true;
+    updateGyroBadge(true);
+    return;
+  }
+
+  // 端末の向き（Landscape/Portrait）に応じた軸変換
+  const orientationAngle = window.orientation ?? (screen.orientation?.angle || 0);
+
+  let rawDeltaX = 0;
+  let rawDeltaY = 0;
+
+  if (orientationAngle === 90) {
+    // 横向き（Landscape Right: ノッチが左・充電口が右）
+    rawDeltaX = -(beta - initialOrientation.beta);
+    rawDeltaY = (gamma - initialOrientation.gamma);
+  } else if (orientationAngle === -90 || orientationAngle === 270) {
+    // 横向き（Landscape Left: ノッチが右・充電口が左）
+    rawDeltaX = (beta - initialOrientation.beta);
+    rawDeltaY = -(gamma - initialOrientation.gamma);
+  } else {
+    // 縦向き（Portrait）
+    rawDeltaX = -(gamma - initialOrientation.gamma);
+    rawDeltaY = -(beta - initialOrientation.beta);
+  }
+
+  // 目標オフセットを計算（範囲クランプ）
+  targetOffset.x = Math.max(-MAX_OFFSET_X, Math.min(MAX_OFFSET_X, rawDeltaX * SENSITIVITY_X));
+  targetOffset.y = Math.max(-MAX_OFFSET_Y, Math.min(MAX_OFFSET_Y, rawDeltaY * SENSITIVITY_Y));
+}
+
+/**
+ * VRモード時の描画 & 視点補間ループ
  */
 function renderVRFrame() {
   if (!isVRMode) return;
 
-  // iOS Safariで動画のデコードデータが利用可能な場合のみ描画
+  // 1. 視点移動のスムージング計算（線形補間 LERP）
+  currentOffset.x += (targetOffset.x - currentOffset.x) * LERP_FACTOR;
+  currentOffset.y += (targetOffset.y - currentOffset.y) * LERP_FACTOR;
+
+  // 左右両方のスクリーンに同一のトランスフォームを適用（左右同期・ズレなし）
+  const transformStr = `translate3d(${currentOffset.x.toFixed(2)}px, ${currentOffset.y.toFixed(2)}px, 0)`;
+  if (screenLeft && screenRight) {
+    screenLeft.style.transform = transformStr;
+    screenRight.style.transform = transformStr;
+  }
+
+  // 2. 1つのvideoから左右Canvasへの同一フレーム描画
   if (videoPlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-    // 動画サイズが確定していればCanvas解像度を更新
     if (videoPlayer.videoWidth && canvasLeft.width !== videoPlayer.videoWidth) {
       updateCanvasDimensions();
     }
-    // 左目用Canvasに現在の動画フレームを描画
     ctxLeft.drawImage(videoPlayer, 0, 0, canvasLeft.width, canvasLeft.height);
-    // 右目用Canvasに同じ動画フレームを描画
     ctxRight.drawImage(videoPlayer, 0, 0, canvasRight.width, canvasRight.height);
   }
 
-  // 次の描画フレームを予約（約60fps〜端末のリフレッシュレートで同期）
+  // 次の描画フレームを予約
   animationFrameId = requestAnimationFrame(renderVRFrame);
+}
+
+/**
+ * iOS 13+ センサー権限リクエスト
+ */
+async function requestSensorPermission() {
+  // iOS Safari 13+ 専用の許可リクエスト API
+  if (
+    typeof DeviceOrientationEvent !== 'undefined' &&
+    typeof DeviceOrientationEvent.requestPermission === 'function'
+  ) {
+    try {
+      const response = await DeviceOrientationEvent.requestPermission();
+      return response === 'granted';
+    } catch (err) {
+      console.warn('DeviceOrientation 権限リクエスト例外:', err);
+      return false;
+    }
+  }
+
+  // requestPermission が存在しないブラウザ（Android, PC等）
+  return 'ondeviceorientation' in window;
 }
 
 /**
@@ -90,33 +277,11 @@ function resetUiFadeTimer() {
   if (uiFadeTimeout) {
     clearTimeout(uiFadeTimeout);
   }
-  // 3秒間操作がなければUIを薄くフェードアウト
   uiFadeTimeout = setTimeout(() => {
     if (isVRMode && vrUiLayer) {
       vrUiLayer.classList.add('faded');
     }
   }, 3000);
-}
-
-/**
- * 再生 / 一時停止時のHUDインジケーター表示
- * @param {boolean} isPlaying - 再生状態（true: 再生中, false: 一時停止中）
- */
-function showPlayPauseIndicator(isPlaying) {
-  const icon = isPlaying ? '▶' : '⏸';
-  indicatorLeft.textContent = icon;
-  indicatorRight.textContent = icon;
-
-  indicatorLeft.classList.add('show');
-  indicatorRight.classList.add('show');
-
-  if (indicatorTimeout) {
-    clearTimeout(indicatorTimeout);
-  }
-  indicatorTimeout = setTimeout(() => {
-    indicatorLeft.classList.remove('show');
-    indicatorRight.classList.remove('show');
-  }, 800);
 }
 
 /**
@@ -130,7 +295,7 @@ function safePlayVideo() {
         showPlayPauseIndicator(true);
       })
       .catch((err) => {
-        console.warn('iOS Safari: 自動再生ポリシーによる一時停止または再生制限:', err);
+        console.warn('iOS Safari: 再生制限ハンドリング:', err);
       });
   }
 }
@@ -138,20 +303,33 @@ function safePlayVideo() {
 /**
  * VRモードを開始する関数
  */
-function enterVR() {
-  // 動画が読み込まれているかチェック
+async function enterVR() {
   if (videoPlayer.error || (!videoPlayer.src && videoPlayer.children.length === 0)) {
     alert('動画が読み込まれていません。test.mp4を配置するか、動画ファイルを選択してください。');
     return;
   }
+
+  // 1. モーションセンサー許可の要求（iOS 13+）
+  const permissionGranted = await requestSensorPermission();
 
   isVRMode = true;
   vrContainer.style.display = 'flex';
   document.documentElement.classList.add('vr-active');
   document.body.classList.add('vr-active');
 
-  // Canvasの解像度を初期化
+  // Canvasの解像度初期化
   updateCanvasDimensions();
+
+  // 2. ジャイロセンサーイベントの登録
+  if (permissionGranted) {
+    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+    updateGyroBadge(true, '🧭 ジャイロ視点連動中');
+  } else {
+    updateGyroBadge(false, '⚠️ センサー無効（固定視点）');
+  }
+
+  // 視点のリセット
+  resetView();
 
   // 描画ループを開始
   if (animationFrameId) {
@@ -172,7 +350,12 @@ function exitVR() {
   document.documentElement.classList.remove('vr-active');
   document.body.classList.remove('vr-active');
 
-  // 描画ループを停止して負荷・電力消費を削減
+  // ジャイロリスナーの解除
+  window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
+  isGyroActive = false;
+  hasCalibrated = false;
+
+  // 描画ループ停止
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = null;
@@ -184,6 +367,16 @@ function exitVR() {
   if (vrUiLayer) {
     vrUiLayer.classList.remove('faded');
   }
+
+  // オフセットリセット
+  targetOffset.x = 0;
+  targetOffset.y = 0;
+  currentOffset.x = 0;
+  currentOffset.y = 0;
+  if (screenLeft && screenRight) {
+    screenLeft.style.transform = 'translate3d(0, 0, 0)';
+    screenRight.style.transform = 'translate3d(0, 0, 0)';
+  }
 }
 
 /**
@@ -192,23 +385,14 @@ function exitVR() {
 function initPlayer() {
   updateStatus('動画（test.mp4）の読み込みを確認中...', 'info');
 
-  // 動画の読み込みが成功したとき
   videoPlayer.addEventListener('loadeddata', () => {
     updateStatus('✅ 動画の読み込みに成功しました。再生または「VR MODE」を押してください。', 'success');
     updateCanvasDimensions();
   });
 
-  // 動画のメタデータが読み込まれたとき
-  videoPlayer.addEventListener('loadedmetadata', () => {
-    updateCanvasDimensions();
-  });
+  videoPlayer.addEventListener('loadedmetadata', updateCanvasDimensions);
+  videoPlayer.addEventListener('canplay', updateCanvasDimensions);
 
-  // 動画が再生可能状態になったとき
-  videoPlayer.addEventListener('canplay', () => {
-    updateCanvasDimensions();
-  });
-
-  // 動画の読み込みに失敗したとき（test.mp4が存在しない場合など）
   videoPlayer.addEventListener('error', (e) => {
     console.warn('動画の読み込みエラー:', videoPlayer.error);
     updateStatus(
@@ -217,7 +401,6 @@ function initPlayer() {
     );
   });
 
-  // ファイルピッカーで任意の動画ファイルが選択されたときの処理
   fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -228,18 +411,36 @@ function initPlayer() {
     }
   });
 
-  // VRボタンのイベントリスナー
+  // VRボタン
   vrButton.addEventListener('click', enterVR);
 
-  // EXIT VRボタンのイベントリスナー（バブリング防止）
+  // EXIT VRボタン
   exitVrButton.addEventListener('click', (e) => {
     e.stopPropagation();
     exitVR();
   });
 
-  // VR画面タップで動画の再生 / 一時停止を切り替え
+  // 正面リセットボタン
+  resetViewButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetView();
+  });
+
+  // VR画面タップ（再生/停止） & ダブルタップ（正面リセット）
   vrContainer.addEventListener('click', (e) => {
-    if (e.target !== exitVrButton) {
+    if (e.target === exitVrButton || e.target === resetViewButton) {
+      return;
+    }
+
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastTapTime;
+    lastTapTime = currentTime;
+
+    // 300ms以内の連続タップはダブルタップと判定（正面リセット）
+    if (timeDiff < 300 && timeDiff > 0) {
+      resetView();
+    } else {
+      // シングルタップ: 再生 / 一時停止
       if (videoPlayer.paused) {
         safePlayVideo();
       } else {
@@ -250,15 +451,37 @@ function initPlayer() {
     }
   });
 
-  // マウス移動・タッチ時にVR UIを表示（iOSのtouchstart対応）
+  // マウス移動・タッチ時にVR UIを表示
   vrContainer.addEventListener('mousemove', resetUiFadeTimer);
   vrContainer.addEventListener('touchstart', resetUiFadeTimer, { passive: true });
 
-  // キーボードの Esc キーでVRモードを終了できるようにする（PCテスト用）
+  // PCテスト用: マウスドラッグによる視点移動シミュレーション
+  vrContainer.addEventListener('mousedown', (e) => {
+    if (!isVRMode) return;
+    isDragging = true;
+    dragStartX = e.clientX - targetOffset.x;
+    dragStartY = e.clientY - targetOffset.y;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isVRMode || !isDragging) return;
+    const nextX = e.clientX - dragStartX;
+    const nextY = e.clientY - dragStartY;
+    targetOffset.x = Math.max(-MAX_OFFSET_X, Math.min(MAX_OFFSET_X, nextX));
+    targetOffset.y = Math.max(-MAX_OFFSET_Y, Math.min(MAX_OFFSET_Y, nextY));
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // キーボード操作（PCテスト用）
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isVRMode) {
+    if (!isVRMode) return;
+
+    if (e.key === 'Escape') {
       exitVR();
-    } else if (e.key === ' ' && isVRMode) {
+    } else if (e.key === ' ') {
       e.preventDefault();
       if (videoPlayer.paused) {
         safePlayVideo();
@@ -267,33 +490,43 @@ function initPlayer() {
         showPlayPauseIndicator(false);
       }
       resetUiFadeTimer();
+    } else if (e.key === 'r' || e.key === 'R') {
+      resetView(); // Rキーで正面リセット
+    } else if (e.key === 'ArrowLeft') {
+      targetOffset.x = Math.min(MAX_OFFSET_X, targetOffset.x + 30);
+    } else if (e.key === 'ArrowRight') {
+      targetOffset.x = Math.max(-MAX_OFFSET_X, targetOffset.x - 30);
+    } else if (e.key === 'ArrowUp') {
+      targetOffset.y = Math.min(MAX_OFFSET_Y, targetOffset.y + 30);
+    } else if (e.key === 'ArrowDown') {
+      targetOffset.y = Math.max(-MAX_OFFSET_Y, targetOffset.y - 30);
     }
   });
 
-  // 画面回転やウィンドウリサイズ時にCanvasの追従を行う
+  // リサイズ・画面回転
   window.addEventListener('resize', () => {
     if (isVRMode) {
       updateCanvasDimensions();
     }
   });
 
-  // iOS Safariの画面の向き変更イベント
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
       if (isVRMode) {
         updateCanvasDimensions();
+        resetView(); // 向きが変わった時は正面を再キャリブレーション
       }
     }, 200);
   });
 
-  // VRモード中のスクロール（バウンス）を完全に抑止
+  // VRモード中のスクロール完全抑止
   window.addEventListener('touchmove', (e) => {
     if (isVRMode) {
       e.preventDefault();
     }
   }, { passive: false });
 
-  // タブ切り替えやスリープ時の省電力・フリーズ防止
+  // バックグラウンド復帰処理
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (animationFrameId) {

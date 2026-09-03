@@ -17,7 +17,7 @@
   <div class="container" id="normalContainer">
     <header class="app-header">
       <h1>VR Browser</h1>
-      <p class="subtitle">Phase 4: iPhone Safari 最適化</p>
+      <p class="subtitle">Phase 5: ジャイロ視点移動（DeviceOrientation）</p>
     </header>
 
     <main class="player-section">
@@ -37,7 +37,7 @@
       <!-- VRモード開始ボタン -->
       <div class="vr-button-section">
         <button id="vrButton" class="vr-button" type="button">
-          🥽 VR MODE
+          🥽 VR MODE（ジャイロ連動）
         </button>
       </div>
 
@@ -59,8 +59,10 @@
   <!-- VR視聴画面（全画面オーバーレイ） -->
   <div id="vrContainer" class="vr-container" style="display: none;">
     <!-- 左目用表示領域（50%幅） -->
-    <div class="vr-eye left-eye">
-      <canvas id="canvasLeft"></canvas>
+    <div class="vr-eye left-eye" id="leftEyeContainer">
+      <div class="vr-screen" id="screenLeft">
+        <canvas id="canvasLeft"></canvas>
+      </div>
       <!-- 左目用 再生/一時停止 HUDインジケーター -->
       <div class="vr-indicator left-indicator" id="indicatorLeft"></div>
     </div>
@@ -69,18 +71,33 @@
     <div class="vr-divider"></div>
 
     <!-- 右目用表示領域（50%幅） -->
-    <div class="vr-eye right-eye">
-      <canvas id="canvasRight"></canvas>
+    <div class="vr-eye right-eye" id="rightEyeContainer">
+      <div class="vr-screen" id="screenRight">
+        <canvas id="canvasRight"></canvas>
+      </div>
       <!-- 右目用 再生/一時停止 HUDインジケーター -->
       <div class="vr-indicator right-indicator" id="indicatorRight"></div>
     </div>
 
     <!-- VRモード用UIレイヤー（邪魔にならないよう自動フェード） -->
     <div class="vr-ui-layer" id="vrUiLayer">
-      <!-- 左上の控えめな EXIT VR ボタン -->
-      <button id="exitVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
-        ✕ EXIT VR
-      </button>
+      <!-- 上部操作バー -->
+      <div class="vr-top-bar">
+        <!-- 左上の控えめな EXIT VR ボタン -->
+        <button id="exitVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
+          ✕ EXIT VR
+        </button>
+
+        <!-- 視点リセットボタン（正面の向きをリセット） -->
+        <button id="resetViewButton" class="reset-view-button" type="button" aria-label="視点を正面にリセット">
+          🎯 正面リセット
+        </button>
+
+        <!-- 操作・センサーステータスヒント -->
+        <div class="vr-status-badge" id="vrStatusBadge">
+          🧭 ジャイロ準備中
+        </div>
+      </div>
 
       <!-- 縦向き時のみ表示される案内（横向き時は自動で非表示） -->
       <div class="vr-portrait-hint">
@@ -88,8 +105,10 @@
       </div>
 
       <!-- 操作ヒント -->
-      <div class="vr-tap-hint">
-        画面タップ: 再生 / 一時停止
+      <div class="vr-bottom-bar">
+        <div class="vr-tap-hint">
+          タップ: 再生/停止 | ダブルタップ: 視点リセット
+        </div>
       </div>
     </div>
   </div>

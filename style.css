@@ -185,7 +185,7 @@ body {
 }
 
 /* ============================================================
-   Phase 4: iPhone Safari 最適化 VR視聴画面レイアウト
+   Phase 5: ジャイロ視点移動対応 VR視聴画面レイアウト
    ============================================================ */
 
 /* VRモード有効時のスクロール完全抑止（iOS Safariバウンススクロール対策） */
@@ -242,8 +242,20 @@ body.vr-active {
   position: relative;
 }
 
-/* 描画用Canvas（縦横比を崩さず、画面からはみ出さない・Retina高精細縮小） */
-.vr-eye canvas {
+/* 仮想スクリーンラッパー（ジャイロに合わせて視点移動） */
+.vr-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  will-change: transform;
+  transform-origin: center center;
+}
+
+/* 描画用Canvas（仮想シアタースクリーンとして少し大きめに配置） */
+.vr-screen canvas {
   width: 100%;
   height: 100%;
   max-width: 100%;
@@ -251,6 +263,9 @@ body.vr-active {
   object-fit: contain;
   display: block;
   background-color: #000000;
+  /* 視点移動を見渡せるよう適度なスケール（1.2倍）を設定 */
+  transform: scale(1.22);
+  transform-origin: center center;
 }
 
 /* 左右の境界線（VRゴーグルのレンズ境界ガイド用センターライン） */
@@ -280,21 +295,29 @@ body.vr-active {
 
 /* 操作がないときにUIを薄くして動画視聴を邪魔しない */
 .vr-ui-layer.faded {
-  opacity: 0.2;
+  opacity: 0.15;
 }
 
-/* EXIT VR ボタン（動画を邪魔しない左上に半透明で配置） */
+/* 上部操作バー */
+.vr-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+/* EXIT VR ボタン */
 .exit-vr-button {
   pointer-events: auto;
-  align-self: flex-start;
-  min-height: 36px;
+  min-height: 34px;
   padding: 6px 14px;
   font-size: 0.8rem;
   font-weight: 600;
   color: #ffffff;
   background-color: rgba(30, 30, 30, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 18px;
+  border-radius: 17px;
   cursor: pointer;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -311,22 +334,56 @@ body.vr-active {
   transform: scale(0.95);
 }
 
-/* 画面右上の操作ヒント */
-.vr-tap-hint {
-  position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
+/* 正面リセットボタン */
+.reset-view-button {
+  pointer-events: auto;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: rgba(0, 112, 243, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 17px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background-color 0.2s, transform 0.1s;
+  touch-action: manipulation;
+}
+
+.reset-view-button:hover {
+  background-color: rgba(0, 112, 243, 0.9);
+}
+
+.reset-view-button:active {
+  transform: scale(0.95);
+}
+
+/* センサーステータスバッジ */
+.vr-status-badge {
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.5);
-  background-color: rgba(0, 0, 0, 0.45);
-  padding: 4px 10px;
-  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 5px 10px;
+  border-radius: 12px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   pointer-events: none;
 }
 
-/* 縦向き時に画面下に表示されるヒント */
+.vr-status-badge.active {
+  color: #86e49d;
+  border-color: rgba(134, 228, 157, 0.3);
+}
+
+.vr-status-badge.disabled {
+  color: #ffd182;
+  border-color: rgba(255, 209, 130, 0.3);
+}
+
+/* 縦向き時に画面中央下に表示されるヒント */
 .vr-portrait-hint {
   align-self: center;
   font-size: 0.78rem;
@@ -335,6 +392,24 @@ body.vr-active {
   border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 6px 14px;
   border-radius: 14px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* 下部バー */
+.vr-bottom-bar {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.vr-tap-hint {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(0, 0, 0, 0.45);
+  padding: 4px 12px;
+  border-radius: 10px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   pointer-events: none;
