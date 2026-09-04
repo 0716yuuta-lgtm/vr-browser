@@ -17,11 +17,11 @@
   <div class="container" id="normalContainer">
     <header class="app-header">
       <h1>VR Browser</h1>
-      <p class="subtitle">Phase 5: ジャイロ視点移動（DeviceOrientation）</p>
+      <p class="subtitle">Phase 5: YouTube動画対応 & 2D VRプレイヤー</p>
     </header>
 
     <main class="player-section">
-      <!-- 動画表示エリア（iOS Safari用に playsinline と webkit-playsinline を設定） -->
+      <!-- 1. ローカル動画表示エリア（HTML5 Video） -->
       <div class="video-container" id="videoContainer">
         <video
           id="videoPlayer"
@@ -34,10 +34,34 @@
         </video>
       </div>
 
-      <!-- VRモード開始ボタン -->
-      <div class="vr-button-section">
+      <!-- 2. YouTube動画表示エリア（YouTube IFrame Player API） -->
+      <div class="youtube-container" id="youtubeContainer" style="display: none;">
+        <div id="youtubePlayerWrapper">
+          <div id="youtubeIframe"></div>
+        </div>
+      </div>
+
+      <!-- YouTube URL入力セクション -->
+      <section class="youtube-input-section">
+        <label for="youtubeUrlInput" class="section-label">📺 YouTube動画を再生</label>
+        <div class="input-group">
+          <input
+            type="text"
+            id="youtubeUrlInput"
+            placeholder="YouTubeのURL（例: https://www.youtube.com/watch?v=...）"
+            class="youtube-input"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false">
+          <button id="loadYoutubeButton" class="youtube-button" type="button">読み込む</button>
+        </div>
+      </section>
+
+      <!-- ローカル2D動画用 VRモード開始ボタン -->
+      <div class="vr-button-section" id="vrButtonSection">
         <button id="vrButton" class="vr-button" type="button">
-          🥽 VR MODE（ジャイロ連動）
+          🥽 2D VR MODE（ローカル動画）
         </button>
       </div>
 
@@ -46,7 +70,7 @@
         <p id="statusText">動画を読み込み中...</p>
       </div>
 
-      <!-- 補助機能: ローカル動画の直接選択（PCやスマホから任意の動画をすぐ試せる補助機能） -->
+      <!-- 補助機能: ローカル動画の直接選択 -->
       <div class="file-picker-section">
         <label for="fileInput" class="file-label">
           📁 端末内の動画ファイルを選択して再生
@@ -56,13 +80,11 @@
     </main>
   </div>
 
-  <!-- VR視聴画面（全画面オーバーレイ） -->
+  <!-- ローカル動画用 VR視聴画面（全画面左右2画面オーバーレイ） -->
   <div id="vrContainer" class="vr-container" style="display: none;">
     <!-- 左目用表示領域（50%幅） -->
-    <div class="vr-eye left-eye" id="leftEyeContainer">
-      <div class="vr-screen" id="screenLeft">
-        <canvas id="canvasLeft"></canvas>
-      </div>
+    <div class="vr-eye left-eye">
+      <canvas id="canvasLeft"></canvas>
       <!-- 左目用 再生/一時停止 HUDインジケーター -->
       <div class="vr-indicator left-indicator" id="indicatorLeft"></div>
     </div>
@@ -71,32 +93,20 @@
     <div class="vr-divider"></div>
 
     <!-- 右目用表示領域（50%幅） -->
-    <div class="vr-eye right-eye" id="rightEyeContainer">
-      <div class="vr-screen" id="screenRight">
-        <canvas id="canvasRight"></canvas>
-      </div>
+    <div class="vr-eye right-eye">
+      <canvas id="canvasRight"></canvas>
       <!-- 右目用 再生/一時停止 HUDインジケーター -->
       <div class="vr-indicator right-indicator" id="indicatorRight"></div>
     </div>
 
     <!-- VRモード用UIレイヤー（邪魔にならないよう自動フェード） -->
     <div class="vr-ui-layer" id="vrUiLayer">
-      <!-- 上部操作バー -->
+      <!-- 上部バー -->
       <div class="vr-top-bar">
         <!-- 左上の控えめな EXIT VR ボタン -->
         <button id="exitVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
           ✕ EXIT VR
         </button>
-
-        <!-- 視点リセットボタン（正面の向きをリセット） -->
-        <button id="resetViewButton" class="reset-view-button" type="button" aria-label="視点を正面にリセット">
-          🎯 正面リセット
-        </button>
-
-        <!-- 操作・センサーステータスヒント -->
-        <div class="vr-status-badge" id="vrStatusBadge">
-          🧭 ジャイロ準備中
-        </div>
       </div>
 
       <!-- 縦向き時のみ表示される案内（横向き時は自動で非表示） -->
@@ -107,12 +117,14 @@
       <!-- 操作ヒント -->
       <div class="vr-bottom-bar">
         <div class="vr-tap-hint">
-          タップ: 再生/停止 | ダブルタップ: 視点リセット
+          画面タップ: 再生 / 一時停止
         </div>
       </div>
     </div>
   </div>
 
+  <!-- YouTube IFrame Player API のスクリプト（非同期読み込み） -->
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="script.js"></script>
 </body>
 </html>

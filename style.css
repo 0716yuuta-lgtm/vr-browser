@@ -61,7 +61,7 @@ body {
   gap: 16px;
 }
 
-/* 通常モードの動画コンテナ */
+/* 通常モードのローカル動画コンテナ */
 .video-container {
   width: 100%;
   background-color: #000000;
@@ -81,6 +81,92 @@ body {
   object-fit: contain;
   display: block;
   background-color: #000;
+}
+
+/* YouTube動画コンテナ */
+.youtube-container {
+  width: 100%;
+  background-color: #000000;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  aspect-ratio: 16 / 9;
+  position: relative;
+}
+
+#youtubePlayerWrapper {
+  width: 100%;
+  height: 100%;
+}
+
+#youtubePlayerWrapper iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: none;
+}
+
+/* YouTube URL入力セクション */
+.youtube-input-section {
+  width: 100%;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.youtube-input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  background-color: #121212;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  color: #ffffff;
+  outline: none;
+  transition: border-color 0.2s ease;
+  min-width: 0;
+}
+
+.youtube-input:focus {
+  border-color: #ff0000;
+}
+
+.youtube-button {
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #e62117 0%, #cc0000 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s, transform 0.1s;
+  touch-action: manipulation;
+}
+
+.youtube-button:hover {
+  opacity: 0.9;
+}
+
+.youtube-button:active {
+  transform: scale(0.97);
 }
 
 /* VRモード開始ボタン */
@@ -159,7 +245,7 @@ body {
 .file-picker-section {
   width: 100%;
   text-align: center;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .file-label {
@@ -185,7 +271,7 @@ body {
 }
 
 /* ============================================================
-   Phase 5: ジャイロ視点移動対応 VR視聴画面レイアウト
+   Phase 4/5: 2D VR視聴画面レイアウト（ジャイロなし・大画面固定表示）
    ============================================================ */
 
 /* VRモード有効時のスクロール完全抑止（iOS Safariバウンススクロール対策） */
@@ -242,20 +328,8 @@ body.vr-active {
   position: relative;
 }
 
-/* 仮想スクリーンラッパー（ジャイロに合わせて視点移動） */
-.vr-screen {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  will-change: transform;
-  transform-origin: center center;
-}
-
-/* 描画用Canvas（仮想シアタースクリーンとして少し大きめに配置） */
-.vr-screen canvas {
+/* 描画用Canvas（縦横比を崩さず、画面からはみ出さない・Retina高精細縮小） */
+.vr-eye canvas {
   width: 100%;
   height: 100%;
   max-width: 100%;
@@ -263,9 +337,6 @@ body.vr-active {
   object-fit: contain;
   display: block;
   background-color: #000000;
-  /* 視点移動を見渡せるよう適度なスケール（1.2倍）を設定 */
-  transform: scale(1.22);
-  transform-origin: center center;
 }
 
 /* 左右の境界線（VRゴーグルのレンズ境界ガイド用センターライン） */
@@ -302,8 +373,7 @@ body.vr-active {
 .vr-top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
   width: 100%;
 }
 
@@ -332,55 +402,6 @@ body.vr-active {
 
 .exit-vr-button:active {
   transform: scale(0.95);
-}
-
-/* 正面リセットボタン */
-.reset-view-button {
-  pointer-events: auto;
-  min-height: 34px;
-  padding: 6px 12px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #ffffff;
-  background-color: rgba(0, 112, 243, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 17px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background-color 0.2s, transform 0.1s;
-  touch-action: manipulation;
-}
-
-.reset-view-button:hover {
-  background-color: rgba(0, 112, 243, 0.9);
-}
-
-.reset-view-button:active {
-  transform: scale(0.95);
-}
-
-/* センサーステータスバッジ */
-.vr-status-badge {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.75);
-  background-color: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 5px 10px;
-  border-radius: 12px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  pointer-events: none;
-}
-
-.vr-status-badge.active {
-  color: #86e49d;
-  border-color: rgba(134, 228, 157, 0.3);
-}
-
-.vr-status-badge.disabled {
-  color: #ffd182;
-  border-color: rgba(255, 209, 130, 0.3);
 }
 
 /* 縦向き時に画面中央下に表示されるヒント */
