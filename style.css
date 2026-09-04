@@ -83,7 +83,7 @@ body {
   background-color: #000;
 }
 
-/* YouTube動画コンテナ（通常モード & VR全画面モード） */
+/* YouTube通常動画コンテナ（通常画面用） */
 .youtube-container {
   width: 100%;
   background-color: #000000;
@@ -92,7 +92,6 @@ body {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
   aspect-ratio: 16 / 9;
   position: relative;
-  transition: all 0.2s ease;
 }
 
 #youtubePlayerWrapper {
@@ -105,36 +104,6 @@ body {
   height: 100%;
   display: block;
   border: none;
-}
-
-/* YouTube VRモード時の全画面スタイル */
-.youtube-container.vr-fullscreen {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  width: 100dvw !important;
-  height: 100dvh !important;
-  z-index: 99999 !important;
-  border-radius: 0 !important;
-  background-color: #000000 !important;
-  aspect-ratio: unset !important;
-  margin: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-/* YouTube VRモード用UI */
-.youtube-vr-ui {
-  position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  left: max(16px, env(safe-area-inset-left));
-  z-index: 100000;
-  pointer-events: auto;
 }
 
 /* YouTube URL入力セクション */
@@ -302,7 +271,7 @@ body {
 }
 
 /* ============================================================
-   Phase 4/5.1: 2D VR視聴画面レイアウト（ローカル動画用 左右2画面）
+   Phase 4/5.2: 全画面VR視聴画面レイアウト（左右50:50等分割・黒背景）
    ============================================================ */
 
 /* VRモード有効時のスクロール完全抑止（iOS Safariバウンススクロール対策） */
@@ -359,7 +328,7 @@ body.vr-active {
   position: relative;
 }
 
-/* 描画用Canvas（縦横比を崩さず、画面からはみ出さない・Retina高精細縮小） */
+/* 描画用Canvas（LOCAL動画用: 縦横比を崩さず、画面からはみ出さない） */
 .vr-eye canvas {
   width: 100%;
   height: 100%;
@@ -368,6 +337,29 @@ body.vr-active {
   object-fit: contain;
   display: block;
   background-color: #000000;
+}
+
+/* YouTube VR用iframeラッパー（左右50%領域内に16:9で自然にフィット） */
+.youtube-eye-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000000;
+  position: relative;
+  overflow: hidden;
+}
+
+.youtube-eye-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border: none;
+  display: block;
 }
 
 /* 左右の境界線（VRゴーグルのレンズ境界ガイド用センターライン） */

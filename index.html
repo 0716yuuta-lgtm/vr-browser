@@ -17,7 +17,7 @@
   <div class="container" id="normalContainer">
     <header class="app-header">
       <h1>VR Browser</h1>
-      <p class="subtitle">Phase 5.1: YouTube & ローカル動画 VRプレイヤー</p>
+      <p class="subtitle">Phase 5.2: YouTube 左右2画面 & ローカル動画 VRプレイヤー</p>
     </header>
 
     <main class="player-section">
@@ -34,16 +34,10 @@
         </video>
       </div>
 
-      <!-- 2. YouTube動画表示エリア（YouTube IFrame Player API） -->
+      <!-- 2. YouTube通常動画表示エリア（YouTube IFrame Player API - 通常画面用1画面） -->
       <div class="youtube-container" id="youtubeContainer" style="display: none;">
         <div id="youtubePlayerWrapper">
-          <div id="youtubeIframe"></div>
-        </div>
-        <!-- YouTube VRモード時に表示されるオーバーレイUI -->
-        <div class="youtube-vr-ui" id="youtubeVrUi" style="display: none;">
-          <button id="exitYoutubeVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
-            ✕ EXIT VR
-          </button>
+          <div id="youtubeIframeNormal"></div>
         </div>
       </div>
 
@@ -67,7 +61,7 @@
       <!-- VRモード開始ボタン -->
       <div class="vr-button-section" id="vrButtonSection">
         <button id="vrButton" class="vr-button" type="button">
-          🥽 VR MODE
+          🥽 2D VR MODE（ローカル動画）
         </button>
       </div>
 
@@ -86,7 +80,7 @@
     </main>
   </div>
 
-  <!-- ローカル動画用 VR視聴画面（全画面左右2画面オーバーレイ） -->
+  <!-- 【LOCAL用】VR視聴画面（全画面左右2画面Canvasオーバーレイ） -->
   <div id="vrContainer" class="vr-container" style="display: none;">
     <!-- 左目用表示領域（50%幅） -->
     <div class="vr-eye left-eye">
@@ -125,6 +119,38 @@
         <div class="vr-tap-hint">
           画面タップ: 再生 / 一時停止
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【YOUTUBE用】VR視聴画面（左右50:50分割 YouTube IFrame 2画面オーバーレイ） -->
+  <div id="youtubeVrContainer" class="vr-container youtube-vr-container" style="display: none;">
+    <!-- 左目用YouTube表示領域（50%幅） -->
+    <div class="vr-eye left-eye">
+      <div class="youtube-eye-wrapper">
+        <div id="youtubeIframeLeft"></div>
+      </div>
+    </div>
+
+    <!-- 左右の境界線（VRゴーグルの中央線ガイド） -->
+    <div class="vr-divider"></div>
+
+    <!-- 右目用YouTube表示領域（50%幅） -->
+    <div class="vr-eye right-eye">
+      <div class="youtube-eye-wrapper">
+        <div id="youtubeIframeRight"></div>
+      </div>
+    </div>
+
+    <!-- YouTube VRモード用UIレイヤー -->
+    <div class="vr-ui-layer" id="youtubeVrUiLayer">
+      <div class="vr-top-bar">
+        <button id="exitYoutubeVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
+          ✕ EXIT VR
+        </button>
+      </div>
+      <div class="vr-portrait-hint">
+        📱 スマホを横向きにすると大きく表示されます
       </div>
     </div>
   </div>
