@@ -45,6 +45,66 @@
             ✕ EXIT VR
           </button>
         </div>
+        <!-- YouTube 360° 実機検証用オーバーレイUI -->
+        <div class="test360-ui-layer" id="test360UiLayer" style="display: none;">
+          <div class="test360-top-bar">
+            <button id="exit360TestButton" class="exit-vr-button" type="button" aria-label="検証モードを終了">
+              ✕ EXIT 360° TEST
+            </button>
+            <span class="test360-badge">Phase 6 実機検証</span>
+          </div>
+
+          <div class="test360-hud-panel" id="test360HudPanel">
+            <div class="hud-header">
+              <span class="hud-title">📊 YouTube Spherical API 検証</span>
+              <button id="toggleHudDetailsBtn" class="hud-toggle-btn" type="button">最小化</button>
+            </div>
+            <div class="hud-body" id="hudBody">
+              <div class="hud-row">
+                <span class="hud-label">APIステータス:</span>
+                <span class="hud-val" id="hudApiStatus">確認中...</span>
+              </div>
+              <div class="hud-props-grid">
+                <div class="prop-item">
+                  <span class="prop-name">Yaw (水平):</span>
+                  <span class="prop-val" id="valYaw">--</span>
+                </div>
+                <div class="prop-item">
+                  <span class="prop-name">Pitch (垂直):</span>
+                  <span class="prop-val" id="valPitch">--</span>
+                </div>
+                <div class="prop-item">
+                  <span class="prop-name">Roll (傾き):</span>
+                  <span class="prop-val" id="valRoll">--</span>
+                </div>
+                <div class="prop-item">
+                  <span class="prop-name">FOV (視野角):</span>
+                  <span class="prop-val" id="valFov">--</span>
+                </div>
+              </div>
+
+              <div class="hud-controls">
+                <div class="control-label">視点制御テスト (setSphericalProperties):</div>
+                <div class="control-buttons">
+                  <button id="btnYawLeft" class="control-btn" type="button">⬅️ 左</button>
+                  <button id="btnPitchUp" class="control-btn" type="button">⬆️ 上</button>
+                  <button id="btnPitchDown" class="control-btn" type="button">⬇️ 下</button>
+                  <button id="btnYawRight" class="control-btn" type="button">➡️ 右</button>
+                  <button id="btnResetSpherical" class="control-btn reset-btn" type="button">🔄 リセット</button>
+                </div>
+              </div>
+
+              <div class="hud-checklist">
+                <div class="checklist-title">📱 iPhone Safari 実機確認項目:</div>
+                <ul>
+                  <li>1. 映像をスワイプして視点変更ができるか（公式UI）</li>
+                  <li>2. プレイヤー内にジャイロ/Cardboardアイコンが出るか</li>
+                  <li>3. 上記の視点制御ボタンで映像の角度が変わるか</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- YouTube URL入力セクション -->
@@ -62,12 +122,19 @@
             spellcheck="false">
           <button id="loadYoutubeButton" class="youtube-button" type="button">読み込む</button>
         </div>
+        <!-- 360°検証用 サンプルURLボタン -->
+        <div class="sample-url-row">
+          <button id="sample360Btn" class="sample-url-button" type="button">🌐 360°サンプル動画URLをセット</button>
+        </div>
       </section>
 
-      <!-- VRモード開始ボタン -->
+      <!-- VRモード & 360°検証ボタン -->
       <div class="vr-button-section" id="vrButtonSection">
         <button id="vrButton" class="vr-button" type="button">
           🥽 VR MODE
+        </button>
+        <button id="test360Button" class="test360-button" type="button" style="display: none;">
+          🧭 360° TEST（実機検証）
         </button>
       </div>
 

@@ -107,8 +107,9 @@ body {
   border: none;
 }
 
-/* YouTube VRモード時の全画面スタイル */
-.youtube-container.vr-fullscreen {
+/* YouTube VR / 360° TEST モード時の全画面スタイル */
+.youtube-container.vr-fullscreen,
+.youtube-container.test360-fullscreen {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -135,6 +136,217 @@ body {
   left: max(16px, env(safe-area-inset-left));
   z-index: 100000;
   pointer-events: auto;
+}
+
+/* ============================================================
+   Phase 6: YouTube 360° 実機検証UIレイヤー & HUDパネル
+   ============================================================ */
+.test360-ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 14px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 14px);
+  pointer-events: none;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.test360-top-bar {
+  pointer-events: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.test360-badge {
+  background: rgba(0, 180, 216, 0.25);
+  color: #90e0ef;
+  border: 1px solid rgba(0, 180, 216, 0.5);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.test360-hud-panel {
+  pointer-events: auto;
+  background: rgba(18, 18, 18, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  max-width: 440px;
+  width: 100%;
+  margin: 0 auto;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.8);
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.hud-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #00b4d8;
+  letter-spacing: 0.3px;
+}
+
+.hud-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #cccccc;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.hud-body.collapsed {
+  display: none;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.hud-label {
+  color: #aaaaaa;
+  font-weight: 600;
+}
+
+.hud-val {
+  color: #86e49d;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.hud-props-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.prop-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.prop-name {
+  color: #888888;
+}
+
+.prop-val {
+  color: #48cae4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+}
+
+.hud-controls {
+  margin-top: 10px;
+}
+
+.control-label {
+  font-size: 0.73rem;
+  color: #cccccc;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.control-btn {
+  flex: 1 1 calc(20% - 6px);
+  min-width: 55px;
+  padding: 6px 4px;
+  background: #282828;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, transform 0.1s;
+  touch-action: manipulation;
+}
+
+.control-btn:hover {
+  background: #383838;
+}
+
+.control-btn:active {
+  background: #0077b6;
+  transform: scale(0.96);
+}
+
+.control-btn.reset-btn {
+  flex: 1 1 100%;
+  background: rgba(230, 33, 23, 0.25);
+  border-color: rgba(230, 33, 23, 0.5);
+  color: #ff8b85;
+}
+
+.control-btn.reset-btn:hover {
+  background: rgba(230, 33, 23, 0.4);
+}
+
+.hud-checklist {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+}
+
+.checklist-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffb703;
+  margin-bottom: 4px;
+}
+
+.hud-checklist ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hud-checklist li {
+  font-size: 0.68rem;
+  color: #bbbbbb;
+  line-height: 1.4;
+  margin-bottom: 2px;
 }
 
 /* YouTube URL入力セクション */
@@ -200,11 +412,40 @@ body {
   transform: scale(0.97);
 }
 
-/* VRモード開始ボタン */
+/* サンプルURLボタン */
+.sample-url-row {
+  margin-top: 4px;
+  display: flex;
+}
+
+.sample-url-button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px dashed #555555;
+  color: #64b5f6;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.sample-url-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #64b5f6;
+}
+
+.sample-url-button:active {
+  transform: scale(0.97);
+}
+
+/* VRモード & 360°検証ボタンセクション */
 .vr-button-section {
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
 
 .vr-button {
@@ -238,6 +479,31 @@ body {
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
+}
+
+.test360-button {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.35);
+  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+  letter-spacing: 0.5px;
+  touch-action: manipulation;
+}
+
+.test360-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 180, 216, 0.55);
+}
+
+.test360-button:active {
+  transform: translateY(0);
 }
 
 /* ステータス・案内メッセージ */

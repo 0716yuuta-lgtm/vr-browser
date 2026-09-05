@@ -17,6 +17,24 @@ const statusMessage = document.getElementById('statusMessage');
 const statusText = document.getElementById('statusText');
 const fileInput = document.getElementById('fileInput');
 
+// 360° 実機検証用要素の取得
+const sample360Btn = document.getElementById('sample360Btn');
+const test360Button = document.getElementById('test360Button');
+const test360UiLayer = document.getElementById('test360UiLayer');
+const exit360TestButton = document.getElementById('exit360TestButton');
+const hudApiStatus = document.getElementById('hudApiStatus');
+const valYaw = document.getElementById('valYaw');
+const valPitch = document.getElementById('valPitch');
+const valRoll = document.getElementById('valRoll');
+const valFov = document.getElementById('valFov');
+const btnYawLeft = document.getElementById('btnYawLeft');
+const btnPitchUp = document.getElementById('btnPitchUp');
+const btnPitchDown = document.getElementById('btnPitchDown');
+const btnYawRight = document.getElementById('btnYawRight');
+const btnResetSpherical = document.getElementById('btnResetSpherical');
+const toggleHudDetailsBtn = document.getElementById('toggleHudDetailsBtn');
+const hudBody = document.getElementById('hudBody');
+
 // VR関連要素の取得
 const vrButton = document.getElementById('vrButton');
 const vrButtonSection = document.getElementById('vrButtonSection');
@@ -37,6 +55,10 @@ const ctxRight = canvasRight.getContext('2d');
 // ============================================================
 let currentSourceType = 'local'; // 'local' | 'youtube'
 let isVRMode = false;
+let is360TestMode = false;
+let sphericalPollInterval = null;
+let currentSpherical = { yaw: 0, pitch: 0, roll: 0, fov: 100 };
+const SAMPLE_360_URL = 'https://www.youtube.com/watch?v=2OzlksZBTiA';
 let animationFrameId = null;
 let uiFadeTimeout = null;
 let indicatorTimeout = null;
@@ -72,8 +94,10 @@ function setSourceType(type) {
       ytPlayer.pauseVideo();
     }
     youtubeContainer.style.display = 'none';
-    youtubeContainer.classList.remove('vr-fullscreen');
+    youtubeContainer.classList.remove('vr-fullscreen', 'test360-fullscreen');
     youtubeVrUi.style.display = 'none';
+    if (test360UiLayer) test360UiLayer.style.display = 'none';
+    if (test360Button) test360Button.style.display = 'none';
     videoContainer.style.display = 'flex';
     vrButton.textContent = '🥽 2D VR MODE（ローカル動画）';
   } else if (type === 'youtube') {
@@ -82,6 +106,7 @@ function setSourceType(type) {
     videoContainer.style.display = 'none';
     vrContainer.style.display = 'none';
     youtubeContainer.style.display = 'block';
+    if (test360Button) test360Button.style.display = 'block';
     vrButton.textContent = '🥽 VR MODE（YouTube動画）';
   }
 }
@@ -171,7 +196,7 @@ function loadYouTubeVideo(videoId) {
         videoId: videoId,
         suggestedQuality: 'hd720'
       });
-      updateStatus(`✅ YouTube動画を読み込みました。再生または「VR MODE」を押してください。`, 'success');
+      updateStatus(`✅ YouTube動画を読み込みました。再生または「VR MODE」「360° TEST」を押してください。`, 'success');
     } catch (e) {
       console.warn('loadVideoById例外、再生成を試みます:', e);
       ytPlayer = null;
@@ -185,10 +210,11 @@ function loadYouTubeVideo(videoId) {
         width: '100%',
         videoId: videoId,
         playerVars: {
-          playsinline: 1,      // iOS Safariでインライン再生
-          rel: 0,              // 関連動画の制限
-          modestbranding: 1,   // YouTubeロゴの控えめ表示
-          enablejsapi: 1,      // JS APIの有効化
+          playsinline: 1,              // iOS Safariでインライン再生
+          rel: 0,                      // 関連動画の制限
+          modestbranding: 1,           // YouTubeロゴの控えめ表示
+          enablejsapi: 1,              // JS APIの有効化
+          enableOrientationSensor: 1, // 360°動画時の端末センサー連携設定
           origin: window.location.origin || undefined
         },
         events: {
@@ -408,6 +434,159 @@ function exitVR() {
 }
 
 // ============================================================
+// Phase 6: YouTube 360° 実機検証処理 (YouTube Spherical API)
+// ============================================================
+
+/**
+ * YouTube IFrame API の getSphericalProperties() を取得し、HUD表示を更新する関数
+ */
+function updateSphericalDisplay() {
+  if (!ytPlayer || typeof ytPlayer.getSphericalProperties !== 'function') {
+    if (hudApiStatus) {
+      hudApiStatus.textContent = '⚠️ API未準備';
+      hudApiStatus.style.color = '#ffd182';
+    }
+    return;
+  }
+
+  try {
+    const props = ytPlayer.getSphericalProperties();
+    if (props && typeof props === 'object' && ('yaw' in props || 'pitch' in props || 'fov' in props)) {
+      currentSpherical = {
+        yaw: props.yaw !== undefined ? props.yaw : currentSpherical.yaw,
+        pitch: props.pitch !== undefined ? props.pitch : currentSpherical.pitch,
+        roll: props.roll !== undefined ? props.roll : currentSpherical.roll,
+        fov: props.fov !== undefined ? props.fov : currentSpherical.fov
+      };
+
+      if (hudApiStatus) {
+        hudApiStatus.textContent = '✅ API利用可能 (360°動画)';
+        hudApiStatus.style.color = '#86e49d';
+      }
+      if (valYaw) valYaw.textContent = `${currentSpherical.yaw.toFixed(1)}°`;
+      if (valPitch) valPitch.textContent = `${currentSpherical.pitch.toFixed(1)}°`;
+      if (valRoll) valRoll.textContent = `${currentSpherical.roll.toFixed(1)}°`;
+      if (valFov) valFov.textContent = `${currentSpherical.fov.toFixed(1)}°`;
+    } else {
+      if (hudApiStatus) {
+        hudApiStatus.textContent = 'ℹ️ 360°動画以外の可能性 (または未再生)';
+        hudApiStatus.style.color = '#ffd182';
+      }
+    }
+  } catch (err) {
+    console.warn('getSphericalProperties 取得エラー:', err);
+    if (hudApiStatus) {
+      hudApiStatus.textContent = '⚠️ 取得エラー';
+      hudApiStatus.style.color = '#ff8b85';
+    }
+  }
+}
+
+/**
+ * YouTube IFrame API の setSphericalProperties() で視点オフセットを適用するテスト関数
+ * @param {number} dYaw - 水平方向の相対変化量（度）
+ * @param {number} dPitch - 垂直方向の相対変化量（度）
+ */
+function setSphericalOffset(dYaw, dPitch) {
+  if (!ytPlayer || typeof ytPlayer.setSphericalProperties !== 'function') {
+    updateStatus('⚠️ YouTubeプレイヤーのSpherical APIが利用できません。', 'warning');
+    return;
+  }
+
+  let newYaw = (currentSpherical.yaw + dYaw) % 360;
+  if (newYaw < -180) newYaw += 360;
+  if (newYaw > 180) newYaw -= 360;
+
+  let newPitch = Math.max(-90, Math.min(90, currentSpherical.pitch + dPitch));
+
+  currentSpherical.yaw = newYaw;
+  currentSpherical.pitch = newPitch;
+
+  try {
+    ytPlayer.setSphericalProperties({
+      yaw: currentSpherical.yaw,
+      pitch: currentSpherical.pitch,
+      roll: currentSpherical.roll,
+      fov: currentSpherical.fov
+    });
+    updateSphericalDisplay();
+  } catch (err) {
+    console.warn('setSphericalProperties 実行エラー:', err);
+  }
+}
+
+/**
+ * 視点を初期状態（正面: yaw=0, pitch=0, roll=0, fov=100）にリセットする関数
+ */
+function resetSpherical() {
+  if (!ytPlayer || typeof ytPlayer.setSphericalProperties !== 'function') return;
+
+  currentSpherical = { yaw: 0, pitch: 0, roll: 0, fov: 100 };
+
+  try {
+    ytPlayer.setSphericalProperties({
+      yaw: 0,
+      pitch: 0,
+      roll: 0,
+      fov: 100
+    });
+    updateSphericalDisplay();
+  } catch (err) {
+    console.warn('resetSpherical 実行エラー:', err);
+  }
+}
+
+/**
+ * 360°実機検証モードを開始する関数
+ */
+function enter360Test() {
+  if (!ytPlayer || !currentYouTubeVideoId) {
+    alert('YouTube動画が読み込まれていません。URLを入力して「読み込む」を押してください。');
+    return;
+  }
+
+  // test.mp4 は絶対に再生しない
+  videoPlayer.pause();
+
+  is360TestMode = true;
+  document.documentElement.classList.add('vr-active');
+  document.body.classList.add('vr-active');
+
+  // YouTubeプレイヤーを360°テスト用全画面化
+  youtubeContainer.classList.add('test360-fullscreen');
+  test360UiLayer.style.display = 'flex';
+
+  // 動画を再生開始
+  if (typeof ytPlayer.playVideo === 'function') {
+    ytPlayer.playVideo();
+  }
+
+  // Spherical API の定期ポーリング開始 (500ms間隔)
+  if (sphericalPollInterval) {
+    clearInterval(sphericalPollInterval);
+  }
+  sphericalPollInterval = setInterval(updateSphericalDisplay, 500);
+  updateSphericalDisplay();
+}
+
+/**
+ * 360°実機検証モードを終了する関数
+ */
+function exit360Test() {
+  is360TestMode = false;
+  document.documentElement.classList.remove('vr-active');
+  document.body.classList.remove('vr-active');
+
+  youtubeContainer.classList.remove('test360-fullscreen');
+  test360UiLayer.style.display = 'none';
+
+  if (sphericalPollInterval) {
+    clearInterval(sphericalPollInterval);
+    sphericalPollInterval = null;
+  }
+}
+
+// ============================================================
 // 初期化処理
 // ============================================================
 function initPlayer() {
@@ -459,6 +638,14 @@ function initPlayer() {
     }
   });
 
+  // 360°サンプル動画URLセットボタン
+  if (sample360Btn) {
+    sample360Btn.addEventListener('click', () => {
+      youtubeUrlInput.value = SAMPLE_360_URL;
+      loadYoutubeButton.click();
+    });
+  }
+
   // YouTube入力欄でのEnterキー押下
   youtubeUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -469,6 +656,11 @@ function initPlayer() {
 
   // VR開始ボタン
   vrButton.addEventListener('click', enterVR);
+
+  // 360° 実機検証開始ボタン
+  if (test360Button) {
+    test360Button.addEventListener('click', enter360Test);
+  }
 
   // ローカルVR用の EXIT VRボタン
   exitVrButton.addEventListener('click', (e) => {
@@ -481,6 +673,39 @@ function initPlayer() {
     e.stopPropagation();
     exitVR();
   });
+
+  // 360° 実機検証用の EXIT ボタン
+  if (exit360TestButton) {
+    exit360TestButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exit360Test();
+    });
+  }
+
+  // 360° 視点制御テストボタン群
+  if (btnYawLeft) {
+    btnYawLeft.addEventListener('click', () => setSphericalOffset(30, 0));
+  }
+  if (btnYawRight) {
+    btnYawRight.addEventListener('click', () => setSphericalOffset(-30, 0));
+  }
+  if (btnPitchUp) {
+    btnPitchUp.addEventListener('click', () => setSphericalOffset(0, 20));
+  }
+  if (btnPitchDown) {
+    btnPitchDown.addEventListener('click', () => setSphericalOffset(0, -20));
+  }
+  if (btnResetSpherical) {
+    btnResetSpherical.addEventListener('click', resetSpherical);
+  }
+
+  // HUD パネル展開 / 最小化切り替え
+  if (toggleHudDetailsBtn && hudBody) {
+    toggleHudDetailsBtn.addEventListener('click', () => {
+      hudBody.classList.toggle('collapsed');
+      toggleHudDetailsBtn.textContent = hudBody.classList.contains('collapsed') ? '展開' : '最小化';
+    });
+  }
 
   // ローカルVR画面タップ（再生 / 一時停止）
   vrContainer.addEventListener('click', (e) => {
@@ -501,6 +726,11 @@ function initPlayer() {
 
   // キーボード操作（PCテスト用）
   window.addEventListener('keydown', (e) => {
+    if (is360TestMode && e.key === 'Escape') {
+      exit360Test();
+      return;
+    }
+
     if (!isVRMode) return;
 
     if (e.key === 'Escape') {
@@ -534,7 +764,7 @@ function initPlayer() {
 
   // VRモード中のスクロール完全抑止
   window.addEventListener('touchmove', (e) => {
-    if (isVRMode) {
+    if (isVRMode || is360TestMode) {
       e.preventDefault();
     }
   }, { passive: false });
