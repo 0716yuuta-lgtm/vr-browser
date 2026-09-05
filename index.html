@@ -17,7 +17,7 @@
   <div class="container" id="normalContainer">
     <header class="app-header">
       <h1>VR Browser</h1>
-      <p class="subtitle">Phase 5.2: YouTube 左右2画面 & ローカル動画 VRプレイヤー</p>
+      <p class="subtitle">Phase 6: YouTube 360°動画 実機検証 & ローカルVR</p>
     </header>
 
     <main class="player-section">
@@ -34,21 +34,41 @@
         </video>
       </div>
 
-      <!-- 2. YouTube通常動画表示エリア（YouTube IFrame Player API - 通常画面用1画面） -->
+      <!-- 2. YouTube単一動画表示エリア（YouTube IFrame Player API - 1つの公式プレイヤー） -->
       <div class="youtube-container" id="youtubeContainer" style="display: none;">
         <div id="youtubePlayerWrapper">
-          <div id="youtubeIframeNormal"></div>
+          <div id="youtubeIframe"></div>
+        </div>
+
+        <!-- 360° TEST モード時のオーバーレイUI -->
+        <div class="test360-ui-layer" id="test360UiLayer" style="display: none;">
+          <div class="test360-top-bar">
+            <button id="exit360TestButton" class="exit-vr-button" type="button" aria-label="テストを終了">
+              ✕ EXIT 360° TEST
+            </button>
+          </div>
+
+          <!-- 360° API 実機検証ステータスパネル -->
+          <div class="test360-status-panel" id="test360StatusPanel">
+            <div class="panel-header">🔍 YouTube 360° API 実機検証情報</div>
+            <div class="panel-body">
+              <p><strong>動画ID:</strong> <span id="infoVideoId">-</span></p>
+              <p><strong>360°認識 (Spherical):</strong> <span id="infoSpherical">-</span></p>
+              <p><strong>視点プロパティ:</strong> <span id="infoProperties">-</span></p>
+              <p class="test-guide">📱 画面スワイプや端末の向きで視点が動くか確認してください</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- YouTube URL入力セクション -->
+      <!-- YouTube URL入力 & 360°検証セクション -->
       <section class="youtube-input-section">
-        <label for="youtubeUrlInput" class="section-label">📺 YouTube動画を再生</label>
+        <label for="youtubeUrlInput" class="section-label">📺 YouTube動画 / 360°動画を入力</label>
         <div class="input-group">
           <input
             type="text"
             id="youtubeUrlInput"
-            placeholder="YouTubeのURL（例: https://www.youtube.com/watch?v=...）"
+            placeholder="YouTube URL（例: https://www.youtube.com/watch?v=...）"
             class="youtube-input"
             autocomplete="off"
             autocorrect="off"
@@ -56,12 +76,21 @@
             spellcheck="false">
           <button id="loadYoutubeButton" class="youtube-button" type="button">読み込む</button>
         </div>
+        <!-- 360°動画サンプルのクイック入力ボタン -->
+        <div class="preset-links">
+          <button id="sample360Btn" class="preset-btn" type="button">🧭 360° サンプルURLを入力</button>
+        </div>
       </section>
 
-      <!-- VRモード開始ボタン -->
+      <!-- アクションボタンセクション（モードに応じたボタン） -->
       <div class="vr-button-section" id="vrButtonSection">
+        <!-- ローカル動画用 2D VRボタン -->
         <button id="vrButton" class="vr-button" type="button">
           🥽 2D VR MODE（ローカル動画）
+        </button>
+        <!-- YouTube 360° 検証テストボタン -->
+        <button id="test360Button" class="test360-button" type="button" style="display: none;">
+          🧭 360° TEST を開始
         </button>
       </div>
 
@@ -119,38 +148,6 @@
         <div class="vr-tap-hint">
           画面タップ: 再生 / 一時停止
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 【YOUTUBE用】VR視聴画面（左右50:50分割 YouTube IFrame 2画面オーバーレイ） -->
-  <div id="youtubeVrContainer" class="vr-container youtube-vr-container" style="display: none;">
-    <!-- 左目用YouTube表示領域（50%幅） -->
-    <div class="vr-eye left-eye">
-      <div class="youtube-eye-wrapper">
-        <div id="youtubeIframeLeft"></div>
-      </div>
-    </div>
-
-    <!-- 左右の境界線（VRゴーグルの中央線ガイド） -->
-    <div class="vr-divider"></div>
-
-    <!-- 右目用YouTube表示領域（50%幅） -->
-    <div class="vr-eye right-eye">
-      <div class="youtube-eye-wrapper">
-        <div id="youtubeIframeRight"></div>
-      </div>
-    </div>
-
-    <!-- YouTube VRモード用UIレイヤー -->
-    <div class="vr-ui-layer" id="youtubeVrUiLayer">
-      <div class="vr-top-bar">
-        <button id="exitYoutubeVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
-          ✕ EXIT VR
-        </button>
-      </div>
-      <div class="vr-portrait-hint">
-        📱 スマホを横向きにすると大きく表示されます
       </div>
     </div>
   </div>

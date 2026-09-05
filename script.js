@@ -1,6 +1,6 @@
 /**
- * VR Browser - Phase 5.2: YouTube 左右2画面 & ローカル動画 VRプレイヤー
- * （YouTube VR MODE時に左右50:50の2画面YouTubeプレイヤーを表示・同期再生）
+ * VR Browser - Phase 6: YouTube 360°動画 実機検証 & ローカルVR
+ * （1つのYouTube公式プレイヤーを用いてiPhone Safariでの360°動作を検証）
  */
 
 // ============================================================
@@ -9,17 +9,23 @@
 const videoPlayer = document.getElementById('videoPlayer');
 const videoContainer = document.getElementById('videoContainer');
 const youtubeContainer = document.getElementById('youtubeContainer');
-const youtubeVrContainer = document.getElementById('youtubeVrContainer');
-const exitYoutubeVrButton = document.getElementById('exitYoutubeVrButton');
+const test360UiLayer = document.getElementById('test360UiLayer');
+const exit360TestButton = document.getElementById('exit360TestButton');
 const youtubeUrlInput = document.getElementById('youtubeUrlInput');
 const loadYoutubeButton = document.getElementById('loadYoutubeButton');
+const sample360Btn = document.getElementById('sample360Btn');
+const vrButton = document.getElementById('vrButton');
+const test360Button = document.getElementById('test360Button');
 const statusMessage = document.getElementById('statusMessage');
 const statusText = document.getElementById('statusText');
 const fileInput = document.getElementById('fileInput');
 
-// VR関連要素の取得（LOCAL用）
-const vrButton = document.getElementById('vrButton');
-const vrButtonSection = document.getElementById('vrButtonSection');
+// 360° 検証情報表示要素
+const infoVideoId = document.getElementById('infoVideoId');
+const infoSpherical = document.getElementById('infoSpherical');
+const infoProperties = document.getElementById('infoProperties');
+
+// LOCAL VR関連要素の取得
 const exitVrButton = document.getElementById('exitVrButton');
 const vrContainer = document.getElementById('vrContainer');
 const vrUiLayer = document.getElementById('vrUiLayer');
@@ -37,16 +43,19 @@ const ctxRight = canvasRight.getContext('2d');
 // ============================================================
 let currentSourceType = 'local'; // 'local' | 'youtube'
 let isVRMode = false;
+let is360TestMode = false;
 let animationFrameId = null;
 let uiFadeTimeout = null;
 let indicatorTimeout = null;
+let sphericalPollInterval = null;
 
-// YouTube IFrame Player API 関連変数
+// YouTube IFrame Player API 関連変数（単一プレイヤー）
 let isYTReady = false;
 let currentYouTubeVideoId = null;
-let ytPlayerNormal = null; // 通常モード用プレイヤー
-let ytPlayerLeft = null;   // VR左目用プレイヤー
-let ytPlayerRight = null;  // VR右目用プレイヤー
+let ytPlayer = null;
+
+// 定番の360°テスト用サンプル動画URL
+const SAMPLE_360_URL = 'https://www.youtube.com/watch?v=2OzlksZBTiA';
 
 // ============================================================
 // ステータスメッセージ & ソースモード切り替え
@@ -70,38 +79,28 @@ function setSourceType(type) {
 
   if (type === 'local') {
     // ローカル動画モード
-    pauseAllYouTubePlayers();
+    if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+      ytPlayer.pauseVideo();
+    }
     youtubeContainer.style.display = 'none';
-    youtubeVrContainer.style.display = 'none';
+    youtubeContainer.classList.remove('test360-fullscreen');
+    test360UiLayer.style.display = 'none';
     videoContainer.style.display = 'flex';
-    vrButton.textContent = '🥽 2D VR MODE（ローカル動画）';
+    vrButton.style.display = 'block';
+    test360Button.style.display = 'none';
   } else if (type === 'youtube') {
     // YouTube動画モード
     videoPlayer.pause();
     videoContainer.style.display = 'none';
     vrContainer.style.display = 'none';
     youtubeContainer.style.display = 'block';
-    vrButton.textContent = '🥽 VR MODE（YouTube 左右2画面）';
-  }
-}
-
-/**
- * すべてのYouTubeプレイヤーを安全に一時停止
- */
-function pauseAllYouTubePlayers() {
-  if (ytPlayerNormal && typeof ytPlayerNormal.pauseVideo === 'function') {
-    ytPlayerNormal.pauseVideo();
-  }
-  if (ytPlayerLeft && typeof ytPlayerLeft.pauseVideo === 'function') {
-    ytPlayerLeft.pauseVideo();
-  }
-  if (ytPlayerRight && typeof ytPlayerRight.pauseVideo === 'function') {
-    ytPlayerRight.pauseVideo();
+    vrButton.style.display = 'none';
+    test360Button.style.display = 'block';
   }
 }
 
 // ============================================================
-// YouTube IFrame Player API 関連処理
+// YouTube IFrame Player API 関連処理（単一プレイヤー）
 // ============================================================
 
 /**
@@ -133,7 +132,7 @@ function extractYouTubeVideoId(url) {
 }
 
 /**
- * YouTube動画を通常プレイヤーに読み込んで再生準備を行う関数
+ * YouTube動画を単一プレイヤーに読み込んで再生準備を行う関数
  * @param {string} videoId - YouTube動画ID
  */
 function loadYouTubeVideo(videoId) {
@@ -151,32 +150,33 @@ function loadYouTubeVideo(videoId) {
     return;
   }
 
-  if (ytPlayerNormal && typeof ytPlayerNormal.loadVideoById === 'function') {
-    ytPlayerNormal.loadVideoById({
+  if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+    ytPlayer.loadVideoById({
       videoId: videoId,
       suggestedQuality: 'hd720'
     });
-    updateStatus(`✅ YouTube動画を読み込みました。再生または「VR MODE」を押してください。`, 'success');
+    updateStatus(`✅ YouTube動画を読み込みました。再生または「360° TEST」を押してください。`, 'success');
   } else {
     try {
-      ytPlayerNormal = new YT.Player('youtubeIframeNormal', {
+      ytPlayer = new YT.Player('youtubeIframe', {
         height: '100%',
         width: '100%',
         videoId: videoId,
         playerVars: {
-          playsinline: 1,
-          rel: 0,
-          modestbranding: 1,
-          enablejsapi: 1,
+          playsinline: 1,      // iOS Safariでインライン再生
+          rel: 0,              // 関連動画の制限
+          modestbranding: 1,   // YouTubeロゴの控えめ表示
+          enablejsapi: 1,      // JS APIの有効化
           origin: window.location.origin || undefined
         },
         events: {
           onReady: () => {
-            updateStatus('✅ YouTubeプレイヤーの準備が完了しました。再生ボタンまたは「VR MODE」を押してください。', 'success');
+            updateStatus('✅ YouTubeプレイヤーの準備が完了しました。再生または「360° TEST」を押してください。', 'success');
           },
           onStateChange: (event) => {
             if (event.data === YT.PlayerState.PLAYING) {
               updateStatus('▶️ YouTube動画を再生中', 'success');
+              checkSphericalProperties();
             } else if (event.data === YT.PlayerState.PAUSED) {
               updateStatus('⏸ YouTube動画を一時停止中', 'info');
             } else if (event.data === YT.PlayerState.ENDED) {
@@ -202,104 +202,88 @@ function loadYouTubeVideo(videoId) {
   }
 }
 
+// ============================================================
+// Phase 6: YouTube 360°動画 実機検証機能
+// ============================================================
+
 /**
- * YouTube VR左右2画面プレイヤーのセットアップと同期再生
- * @param {string} videoId - 再生するYouTube動画ID
- * @param {number} startSeconds - 開始秒数
+ * YouTube IFrame Player API の 360°（Spherical）関連APIを呼び出して確認
  */
-function setupYouTubeVrPlayers(videoId, startSeconds = 0) {
-  const roundedStart = Math.max(0, Math.floor(startSeconds));
+function checkSphericalProperties() {
+  if (!ytPlayer) return;
 
-  // 1. 左目用プレイヤー（マスター）の初期化 / ロード
-  if (ytPlayerLeft && typeof ytPlayerLeft.loadVideoById === 'function') {
-    ytPlayerLeft.loadVideoById({
-      videoId: videoId,
-      startSeconds: roundedStart,
-      suggestedQuality: 'hd720'
-    });
-    ytPlayerLeft.playVideo();
-  } else {
-    try {
-      ytPlayerLeft = new YT.Player('youtubeIframeLeft', {
-        height: '100%',
-        width: '100%',
-        videoId: videoId,
-        playerVars: {
-          playsinline: 1,
-          rel: 0,
-          modestbranding: 1,
-          enablejsapi: 1,
-          start: roundedStart,
-          origin: window.location.origin || undefined
-        },
-        events: {
-          onReady: (e) => {
-            e.target.seekTo(startSeconds, true);
-            e.target.playVideo();
-          },
-          onStateChange: handleLeftPlayerStateChange
-        }
-      });
-    } catch (err) {
-      console.error('YouTube VR Left Player Error:', err);
-    }
-  }
+  infoVideoId.textContent = currentYouTubeVideoId || '-';
 
-  // 2. 右目用プレイヤー（スレーブ）の初期化 / ロード（音声をミュートしてエコー・ズレを完全防止）
-  if (ytPlayerRight && typeof ytPlayerRight.loadVideoById === 'function') {
-    ytPlayerRight.mute(); // 右側はミュート
-    ytPlayerRight.loadVideoById({
-      videoId: videoId,
-      startSeconds: roundedStart,
-      suggestedQuality: 'hd720'
-    });
-    ytPlayerRight.playVideo();
-  } else {
+  // 公式API: getSphericalProperties() の存在と実行確認
+  if (typeof ytPlayer.getSphericalProperties === 'function') {
     try {
-      ytPlayerRight = new YT.Player('youtubeIframeRight', {
-        height: '100%',
-        width: '100%',
-        videoId: videoId,
-        playerVars: {
-          playsinline: 1,
-          rel: 0,
-          modestbranding: 1,
-          enablejsapi: 1,
-          start: roundedStart,
-          origin: window.location.origin || undefined
-        },
-        events: {
-          onReady: (e) => {
-            e.target.mute(); // 右側はミュート
-            e.target.seekTo(startSeconds, true);
-            e.target.playVideo();
-          }
-        }
-      });
+      const props = ytPlayer.getSphericalProperties();
+      if (props && Object.keys(props).length > 0) {
+        infoSpherical.textContent = '✅ 360°動画として認識中 (Spherical API対応)';
+        const yaw = props.yaw !== undefined ? props.yaw.toFixed(1) + '°' : 'N/A';
+        const pitch = props.pitch !== undefined ? props.pitch.toFixed(1) + '°' : 'N/A';
+        const roll = props.roll !== undefined ? props.roll.toFixed(1) + '°' : 'N/A';
+        const fov = props.fov !== undefined ? props.fov.toFixed(1) + '°' : 'N/A';
+        infoProperties.textContent = `yaw: ${yaw}, pitch: ${pitch}, roll: ${roll}, fov: ${fov}`;
+      } else {
+        infoSpherical.textContent = '⚠️ Spherical API利用可能（空または未初期化）';
+        infoProperties.textContent = '通常2D動画 または メタデータ読み込み中';
+      }
     } catch (err) {
-      console.error('YouTube VR Right Player Error:', err);
+      infoSpherical.textContent = `⚠️ 例外: ${err.message}`;
+      infoProperties.textContent = '取得エラー';
     }
+  } else {
+    infoSpherical.textContent = '❌ getSphericalProperties API 未提供（ブラウザ環境または埋め込み制限）';
+    infoProperties.textContent = 'N/A';
   }
 }
 
 /**
- * 左目YouTubeプレイヤー（マスター）の再生状態変化を右目プレイヤーに同期
+ * 360° TEST を開始する関数（全画面シアター表示 + 検証パネル表示）
  */
-function handleLeftPlayerStateChange(event) {
-  if (!ytPlayerRight || typeof ytPlayerRight.playVideo !== 'function') return;
+function enter360Test() {
+  if (!currentYouTubeVideoId || !ytPlayer) {
+    alert('YouTube動画が読み込まれていません。YouTube URLを入力して「読み込む」を押してください。');
+    return;
+  }
 
-  if (event.data === YT.PlayerState.PLAYING) {
-    // 再生状態の同期 & 再生位置の微調整
-    const leftTime = (ytPlayerLeft && typeof ytPlayerLeft.getCurrentTime === 'function') ? ytPlayerLeft.getCurrentTime() : 0;
-    const rightTime = (typeof ytPlayerRight.getCurrentTime === 'function') ? ytPlayerRight.getCurrentTime() : 0;
-    if (Math.abs(leftTime - rightTime) > 0.3) {
-      ytPlayerRight.seekTo(leftTime, true);
-    }
-    ytPlayerRight.playVideo();
-  } else if (event.data === YT.PlayerState.PAUSED) {
-    ytPlayerRight.pauseVideo();
-  } else if (event.data === YT.PlayerState.BUFFERING) {
-    ytPlayerRight.pauseVideo();
+  // test.mp4 は絶対に再生しない
+  videoPlayer.pause();
+
+  is360TestMode = true;
+  document.documentElement.classList.add('vr-active');
+  document.body.classList.add('vr-active');
+
+  // 単一のYouTubeプレイヤーを全画面シアター表示化
+  youtubeContainer.classList.add('test360-fullscreen');
+  test360UiLayer.style.display = 'flex';
+
+  // 動画を再生開始
+  if (typeof ytPlayer.playVideo === 'function') {
+    ytPlayer.playVideo();
+  }
+
+  // 1秒ごとにSpherical APIの状態を更新
+  checkSphericalProperties();
+  if (sphericalPollInterval) clearInterval(sphericalPollInterval);
+  sphericalPollInterval = setInterval(checkSphericalProperties, 1000);
+}
+
+/**
+ * 360° TEST を終了する関数
+ */
+function exit360Test() {
+  is360TestMode = false;
+  document.documentElement.classList.remove('vr-active');
+  document.body.classList.remove('vr-active');
+
+  youtubeContainer.classList.remove('test360-fullscreen');
+  test360UiLayer.style.display = 'none';
+
+  if (sphericalPollInterval) {
+    clearInterval(sphericalPollInterval);
+    sphericalPollInterval = null;
   }
 }
 
@@ -395,109 +379,54 @@ function safePlayVideo() {
   }
 }
 
-// ============================================================
-// VRモード開始・終了処理（LOCAL / YOUTUBE 完全分岐）
-// ============================================================
-
 /**
- * VRモードを開始する関数
- * 現在選択中の動画ソース（LOCAL / YOUTUBE）を正しく判定して起動
+ * ローカル動画用 VRモードを開始する関数
  */
 function enterVR() {
-  if (currentSourceType === 'local') {
-    // ----------------------------------------------------
-    // 1. ローカル動画の場合: Phase 4 左右2画面 Canvas VR表示
-    // ----------------------------------------------------
-    if (videoPlayer.error || (!videoPlayer.src && videoPlayer.children.length === 0)) {
-      alert('ローカル動画が読み込まれていません。test.mp4を配置するか、動画ファイルを選択してください。');
-      return;
-    }
+  if (currentSourceType !== 'local') return;
 
-    isVRMode = true;
-    vrContainer.style.display = 'flex';
-    document.documentElement.classList.add('vr-active');
-    document.body.classList.add('vr-active');
-
-    // Canvasの解像度初期化
-    updateCanvasDimensions();
-
-    // 描画ループを開始
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-    }
-    animationFrameId = requestAnimationFrame(renderVRFrame);
-
-    // UIフェードタイマー開始
-    resetUiFadeTimer();
-
-  } else if (currentSourceType === 'youtube') {
-    // ----------------------------------------------------
-    // 2. YouTube動画の場合: 左右50:50 YouTube 2画面 VR表示
-    // ----------------------------------------------------
-    if (!currentYouTubeVideoId) {
-      alert('YouTube動画が読み込まれていません。YouTube URLを入力して「読み込む」を押してください。');
-      return;
-    }
-
-    // test.mp4 は絶対に再生しない
-    videoPlayer.pause();
-
-    // 通常プレイヤーの現在再生位置を取得
-    let currentSeconds = 0;
-    if (ytPlayerNormal && typeof ytPlayerNormal.getCurrentTime === 'function') {
-      currentSeconds = ytPlayerNormal.getCurrentTime() || 0;
-      ytPlayerNormal.pauseVideo();
-    }
-
-    isVRMode = true;
-    document.documentElement.classList.add('vr-active');
-    document.body.classList.add('vr-active');
-
-    // YouTube 左右2画面 VRコンテナを表示
-    youtubeVrContainer.style.display = 'flex';
-
-    // 左右のプレイヤーを初期化・同期再生開始
-    setupYouTubeVrPlayers(currentYouTubeVideoId, currentSeconds);
+  if (videoPlayer.error || (!videoPlayer.src && videoPlayer.children.length === 0)) {
+    alert('ローカル動画が読み込まれていません。test.mp4を配置するか、動画ファイルを選択してください。');
+    return;
   }
+
+  isVRMode = true;
+  vrContainer.style.display = 'flex';
+  document.documentElement.classList.add('vr-active');
+  document.body.classList.add('vr-active');
+
+  // Canvasの解像度初期化
+  updateCanvasDimensions();
+
+  // 描画ループを開始
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+  animationFrameId = requestAnimationFrame(renderVRFrame);
+
+  // UIフェードタイマー開始
+  resetUiFadeTimer();
 }
 
 /**
- * VRモードを終了する関数
+ * ローカル動画用 VRモードを終了する関数
  */
 function exitVR() {
   isVRMode = false;
+  vrContainer.style.display = 'none';
   document.documentElement.classList.remove('vr-active');
   document.body.classList.remove('vr-active');
 
-  if (currentSourceType === 'local') {
-    // ローカルVRの終了
-    vrContainer.style.display = 'none';
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
 
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
-
-    if (uiFadeTimeout) {
-      clearTimeout(uiFadeTimeout);
-    }
-    if (vrUiLayer) {
-      vrUiLayer.classList.remove('faded');
-    }
-  } else if (currentSourceType === 'youtube') {
-    // YouTube VRの終了（左右プレイヤーを停止し、通常プレイヤーへ復帰）
-    let currentSeconds = 0;
-    if (ytPlayerLeft && typeof ytPlayerLeft.getCurrentTime === 'function') {
-      currentSeconds = ytPlayerLeft.getCurrentTime() || 0;
-    }
-
-    pauseAllYouTubePlayers();
-    youtubeVrContainer.style.display = 'none';
-
-    // 通常プレイヤーに再生位置を引き継ぐ
-    if (ytPlayerNormal && typeof ytPlayerNormal.seekTo === 'function') {
-      ytPlayerNormal.seekTo(currentSeconds, true);
-    }
+  if (uiFadeTimeout) {
+    clearTimeout(uiFadeTimeout);
+  }
+  if (vrUiLayer) {
+    vrUiLayer.classList.remove('faded');
   }
 }
 
@@ -553,6 +482,15 @@ function initPlayer() {
     }
   });
 
+  // 360° サンプルURLボタンのイベント
+  sample360Btn.addEventListener('click', () => {
+    youtubeUrlInput.value = SAMPLE_360_URL;
+    const videoId = extractYouTubeVideoId(SAMPLE_360_URL);
+    if (videoId) {
+      loadYouTubeVideo(videoId);
+    }
+  });
+
   // YouTube入力欄でのEnterキー押下
   youtubeUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -561,8 +499,11 @@ function initPlayer() {
     }
   });
 
-  // VR開始ボタン
+  // ローカルVR開始ボタン
   vrButton.addEventListener('click', enterVR);
+
+  // 360° TEST開始ボタン
+  test360Button.addEventListener('click', enter360Test);
 
   // ローカルVR用の EXIT VRボタン
   exitVrButton.addEventListener('click', (e) => {
@@ -570,10 +511,10 @@ function initPlayer() {
     exitVR();
   });
 
-  // YouTube VR用の EXIT VRボタン
-  exitYoutubeVrButton.addEventListener('click', (e) => {
+  // 360° TEST用の EXIT ボタン
+  exit360TestButton.addEventListener('click', (e) => {
     e.stopPropagation();
-    exitVR();
+    exit360Test();
   });
 
   // ローカルVR画面タップ（再生 / 一時停止）
@@ -595,19 +536,23 @@ function initPlayer() {
 
   // キーボード操作（PCテスト用）
   window.addEventListener('keydown', (e) => {
-    if (!isVRMode) return;
-
-    if (e.key === 'Escape') {
-      exitVR();
-    } else if (e.key === ' ' && currentSourceType === 'local') {
-      e.preventDefault();
-      if (videoPlayer.paused) {
-        safePlayVideo();
-      } else {
-        videoPlayer.pause();
-        showPlayPauseIndicator(false);
+    if (isVRMode) {
+      if (e.key === 'Escape') {
+        exitVR();
+      } else if (e.key === ' ' && currentSourceType === 'local') {
+        e.preventDefault();
+        if (videoPlayer.paused) {
+          safePlayVideo();
+        } else {
+          videoPlayer.pause();
+          showPlayPauseIndicator(false);
+        }
+        resetUiFadeTimer();
       }
-      resetUiFadeTimer();
+    } else if (is360TestMode) {
+      if (e.key === 'Escape') {
+        exit360Test();
+      }
     }
   });
 
@@ -628,7 +573,7 @@ function initPlayer() {
 
   // VRモード中のスクロール完全抑止
   window.addEventListener('touchmove', (e) => {
-    if (isVRMode) {
+    if (isVRMode || is360TestMode) {
       e.preventDefault();
     }
   }, { passive: false });
