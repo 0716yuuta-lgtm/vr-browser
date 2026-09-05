@@ -17,7 +17,7 @@
   <div class="container" id="normalContainer">
     <header class="app-header">
       <h1>VR Browser</h1>
-      <p class="subtitle">Phase 6: YouTube 360°動画 実機検証 & ローカルVR</p>
+      <p class="subtitle">YouTube & ローカル動画 VRプレイヤー</p>
     </header>
 
     <main class="player-section">
@@ -34,41 +34,27 @@
         </video>
       </div>
 
-      <!-- 2. YouTube単一動画表示エリア（YouTube IFrame Player API - 1つの公式プレイヤー） -->
+      <!-- 2. YouTube動画表示エリア（YouTube IFrame Player API） -->
       <div class="youtube-container" id="youtubeContainer" style="display: none;">
         <div id="youtubePlayerWrapper">
           <div id="youtubeIframe"></div>
         </div>
-
-        <!-- 360° TEST モード時のオーバーレイUI -->
-        <div class="test360-ui-layer" id="test360UiLayer" style="display: none;">
-          <div class="test360-top-bar">
-            <button id="exit360TestButton" class="exit-vr-button" type="button" aria-label="テストを終了">
-              ✕ EXIT 360° TEST
-            </button>
-          </div>
-
-          <!-- 360° API 実機検証ステータスパネル -->
-          <div class="test360-status-panel" id="test360StatusPanel">
-            <div class="panel-header">🔍 YouTube 360° API 実機検証情報</div>
-            <div class="panel-body">
-              <p><strong>動画ID:</strong> <span id="infoVideoId">-</span></p>
-              <p><strong>360°認識 (Spherical):</strong> <span id="infoSpherical">-</span></p>
-              <p><strong>視点プロパティ:</strong> <span id="infoProperties">-</span></p>
-              <p class="test-guide">📱 画面スワイプや端末の向きで視点が動くか確認してください</p>
-            </div>
-          </div>
+        <!-- YouTube VRモード時に表示されるオーバーレイUI -->
+        <div class="youtube-vr-ui" id="youtubeVrUi" style="display: none;">
+          <button id="exitYoutubeVrButton" class="exit-vr-button" type="button" aria-label="通常モードに戻る">
+            ✕ EXIT VR
+          </button>
         </div>
       </div>
 
-      <!-- YouTube URL入力 & 360°検証セクション -->
+      <!-- YouTube URL入力セクション -->
       <section class="youtube-input-section">
-        <label for="youtubeUrlInput" class="section-label">📺 YouTube動画 / 360°動画を入力</label>
+        <label for="youtubeUrlInput" class="section-label">📺 YouTube動画を再生</label>
         <div class="input-group">
           <input
             type="text"
             id="youtubeUrlInput"
-            placeholder="YouTube URL（例: https://www.youtube.com/watch?v=...）"
+            placeholder="YouTubeのURL（例: https://www.youtube.com/watch?v=...）"
             class="youtube-input"
             autocomplete="off"
             autocorrect="off"
@@ -76,21 +62,12 @@
             spellcheck="false">
           <button id="loadYoutubeButton" class="youtube-button" type="button">読み込む</button>
         </div>
-        <!-- 360°動画サンプルのクイック入力ボタン -->
-        <div class="preset-links">
-          <button id="sample360Btn" class="preset-btn" type="button">🧭 360° サンプルURLを入力</button>
-        </div>
       </section>
 
-      <!-- アクションボタンセクション（モードに応じたボタン） -->
+      <!-- VRモード開始ボタン -->
       <div class="vr-button-section" id="vrButtonSection">
-        <!-- ローカル動画用 2D VRボタン -->
         <button id="vrButton" class="vr-button" type="button">
-          🥽 2D VR MODE（ローカル動画）
-        </button>
-        <!-- YouTube 360° 検証テストボタン -->
-        <button id="test360Button" class="test360-button" type="button" style="display: none;">
-          🧭 360° TEST を開始
+          🥽 VR MODE
         </button>
       </div>
 
@@ -152,8 +129,8 @@
     </div>
   </div>
 
-  <!-- YouTube IFrame Player API のスクリプト（非同期読み込み） -->
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- script.js を先に読み込み、その後に YouTube IFrame API を読み込む（コールバック登録を確実に保証） -->
   <script src="script.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
