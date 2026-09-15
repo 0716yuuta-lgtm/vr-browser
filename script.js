@@ -35,6 +35,26 @@ const btnResetSpherical = document.getElementById('btnResetSpherical');
 const toggleHudDetailsBtn = document.getElementById('toggleHudDetailsBtn');
 const hudBody = document.getElementById('hudBody');
 
+// Phase 7: WebGL 360° 要素の取得
+const webgl360Button = document.getElementById('webgl360Button');
+const webgl360Container = document.getElementById('webgl360Container');
+const webglCanvas = document.getElementById('webglCanvas');
+const webglUiLayer = document.getElementById('webglUiLayer');
+const exitWebgl360Button = document.getElementById('exitWebgl360Button');
+const webglHudPanel = document.getElementById('webglHudPanel');
+const toggleWebglHudBtn = document.getElementById('toggleWebglHudBtn');
+const webglHudBody = document.getElementById('webglHudBody');
+const webglYawVal = document.getElementById('webglYawVal');
+const webglPitchVal = document.getElementById('webglPitchVal');
+const webglFovVal = document.getElementById('webglFovVal');
+const webglTextureStatus = document.getElementById('webglTextureStatus');
+const webglBtnLeft = document.getElementById('webglBtnLeft');
+const webglBtnUp = document.getElementById('webglBtnUp');
+const webglBtnDown = document.getElementById('webglBtnDown');
+const webglBtnRight = document.getElementById('webglBtnRight');
+const webglBtnReset = document.getElementById('webglBtnReset');
+const webglFileInput = document.getElementById('webglFileInput');
+
 // VR関連要素の取得
 const vrButton = document.getElementById('vrButton');
 const vrButtonSection = document.getElementById('vrButtonSection');
@@ -62,6 +82,13 @@ const SAMPLE_360_URL = 'https://www.youtube.com/watch?v=2OzlksZBTiA';
 let animationFrameId = null;
 let uiFadeTimeout = null;
 let indicatorTimeout = null;
+
+// Phase 7: WebGL 360° 状態変数
+let isWebGL360Mode = false;
+let webglYaw = 0.0;
+let webglPitch = 0.0;
+let webglFov = 75.0;
+let webglAnimationFrameId = null;
 
 // YouTube IFrame Player API 関連変数
 let ytPlayer = null;
@@ -98,14 +125,18 @@ function setSourceType(type) {
     youtubeVrUi.style.display = 'none';
     if (test360UiLayer) test360UiLayer.style.display = 'none';
     if (test360Button) test360Button.style.display = 'none';
+    if (webgl360Button) webgl360Button.style.display = 'block';
     videoContainer.style.display = 'flex';
     vrButton.textContent = '🥽 2D VR MODE（ローカル動画）';
   } else if (type === 'youtube') {
     // YouTube動画モード
     videoPlayer.pause();
+    if (isWebGL360Mode) exitWebGL360();
     videoContainer.style.display = 'none';
     vrContainer.style.display = 'none';
+    if (webgl360Container) webgl360Container.style.display = 'none';
     youtubeContainer.style.display = 'block';
+    if (webgl360Button) webgl360Button.style.display = 'none';
     if (test360Button) test360Button.style.display = 'block';
     vrButton.textContent = '🥽 VR MODE（YouTube動画）';
   }
@@ -587,6 +618,397 @@ function exit360Test() {
 }
 
 // ============================================================
+// Phase 7: Pure WebGL 360° 球面動画レンダラー
+// ============================================================
+
+let glContext = null;
+let glProgram = null;
+const glUniforms = {};
+const glBuffers = {};
+let glVideoTexture = null;
+let glSphereIndexCount = 0;
+let isWebGLInitialized = false;
+
+// 頂点シェーダー（GLSL 1.0）
+const VS_SOURCE = `
+  attribute vec3 aPosition;
+  attribute vec2 aTexCoord;
+
+  uniform mat4 uProjectionMatrix;
+  uniform mat4 uViewMatrix;
+
+  varying vec2 vTexCoord;
+
+  void main() {
+    vTexCoord = aTexCoord;
+    gl_Position = uProjectionMatrix * uViewMatrix * vec4(aPosition, 1.0);
+  }
+`;
+
+// フラグメントシェーダー（GLSL 1.0）
+const FS_SOURCE = `
+  precision mediump float;
+
+  varying vec2 vTexCoord;
+  uniform sampler2D uSampler;
+
+  void main() {
+    gl_FragColor = texture2D(uSampler, vTexCoord);
+  }
+`;
+
+/**
+ * シェーダーをコンパイルするヘルパー関数
+ */
+function compileShader(gl, source, type) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
+}
+
+/**
+ * UV球体の頂点・UV・インデックスを生成する関数
+ * 内側から見渡すため、半径R=10の球体を作成
+ */
+function createUVSphere(latBands = 48, lonBands = 48, radius = 10.0) {
+  const positions = [];
+  const texCoords = [];
+  const indices = [];
+
+  for (let lat = 0; lat <= latBands; lat++) {
+    const theta = (lat * Math.PI) / latBands; // 0 to PI
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
+
+    for (let lon = 0; lon <= lonBands; lon++) {
+      const phi = (lon * 2 * Math.PI) / lonBands; // 0 to 2PI
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+
+      // 球体座標
+      const x = radius * sinTheta * sinPhi;
+      const y = radius * cosTheta;
+      const z = radius * sinTheta * cosPhi;
+
+      // UVテクスチャ座標（左右の自然な視界向きのためUを反転）
+      const u = 1.0 - lon / lonBands;
+      const v = lat / latBands;
+
+      positions.push(x, y, z);
+      texCoords.push(u, v);
+    }
+  }
+
+  // インデックスの生成（内側から両面描画）
+  for (let lat = 0; lat < latBands; lat++) {
+    for (let lon = 0; lon < lonBands; lon++) {
+      const first = lat * (lonBands + 1) + lon;
+      const second = first + lonBands + 1;
+
+      // 2つの三角形で四角形を形成
+      indices.push(first, second, first + 1);
+      indices.push(second, second + 1, first + 1);
+    }
+  }
+
+  return {
+    positions: new Float32Array(positions),
+    texCoords: new Float32Array(texCoords),
+    indices: new Uint16Array(indices)
+  };
+}
+
+/**
+ * 4x4 透視投影行列（Pure JS）
+ */
+function mat4Perspective(fovDeg, aspect, near, far) {
+  const fovRad = (fovDeg * Math.PI) / 180.0;
+  const f = 1.0 / Math.tan(fovRad / 2.0);
+  const rangeInv = 1.0 / (near - far);
+
+  return new Float32Array([
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) * rangeInv, -1,
+    0, 0, (2 * far * near) * rangeInv, 0
+  ]);
+}
+
+/**
+ * 4x4 ビュー回転行列（Pitch * Yaw）
+ */
+function mat4Rotation(yawDeg, pitchDeg) {
+  const yawRad = (yawDeg * Math.PI) / 180.0;
+  const pitchRad = (pitchDeg * Math.PI) / 180.0;
+
+  const cosY = Math.cos(yawRad);
+  const sinY = Math.sin(yawRad);
+  const cosP = Math.cos(pitchRad);
+  const sinP = Math.sin(pitchRad);
+
+  return new Float32Array([
+    cosY,        sinP * sinY, -cosP * sinY, 0,
+    0,           cosP,        sinP,         0,
+    sinY,       -sinP * cosY,  cosP * cosY, 0,
+    0,           0,           0,            1
+  ]);
+}
+
+/**
+ * WebGL 360° レンダラーの初期化
+ */
+function initWebGL360() {
+  if (isWebGLInitialized && glContext) return true;
+
+  try {
+    const gl = webglCanvas.getContext('webgl', { antialias: true, alpha: false, preserveDrawingBuffer: false })
+            || webglCanvas.getContext('experimental-webgl');
+
+    if (!gl) {
+      alert('お使いのブラウザはWebGLに対応していません。');
+      return false;
+    }
+
+    glContext = gl;
+
+    // シェーダーのコンパイル & プログラム作成
+    const vs = compileShader(gl, VS_SOURCE, gl.VERTEX_SHADER);
+    const fs = compileShader(gl, FS_SOURCE, gl.FRAGMENT_SHADER);
+    if (!vs || !fs) return false;
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      return false;
+    }
+
+    glProgram = program;
+    gl.useProgram(program);
+
+    // Attribute & Uniform ロケーション取得
+    const aPosition = gl.getAttribLocation(program, 'aPosition');
+    const aTexCoord = gl.getAttribLocation(program, 'aTexCoord');
+    glUniforms.uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
+    glUniforms.uViewMatrix = gl.getUniformLocation(program, 'uViewMatrix');
+    glUniforms.uSampler = gl.getUniformLocation(program, 'uSampler');
+
+    // 球体メッシュの生成 & バッファ転送
+    const sphere = createUVSphere(48, 48, 10.0);
+    glSphereIndexCount = sphere.indices.length;
+
+    // 頂点バッファ
+    const posBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, sphere.positions, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    glBuffers.position = posBuffer;
+
+    // UVバッファ
+    const uvBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, sphere.texCoords, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(aTexCoord);
+    gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
+    glBuffers.texCoord = uvBuffer;
+
+    // インデックスバッファ
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere.indices, gl.STATIC_DRAW);
+    glBuffers.index = indexBuffer;
+
+    // 動画テクスチャの作成 (iOS Safari WebKit NPOT設定)
+    glVideoTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, glVideoTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    // 初期1x1黒テクスチャ
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+
+    // カリング無効（球体内部から全方位を描画）
+    gl.disable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
+
+    isWebGLInitialized = true;
+    console.log('Phase 7: Pure WebGL 360° renderer initialized successfully.');
+    return true;
+  } catch (err) {
+    console.error('WebGL Initialization Error:', err);
+    return false;
+  }
+}
+
+/**
+ * WebGL 360° キャンバスのサイズ調整
+ */
+function resizeWebGLCanvas() {
+  if (!webglCanvas || !glContext) return;
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+
+  const displayWidth = Math.round(width * Math.min(dpr, 2));
+  const displayHeight = Math.round(height * Math.min(dpr, 2));
+
+  if (webglCanvas.width !== displayWidth || webglCanvas.height !== displayHeight) {
+    webglCanvas.width = displayWidth;
+    webglCanvas.height = displayHeight;
+    glContext.viewport(0, 0, displayWidth, displayHeight);
+  }
+}
+
+/**
+ * WebGL 360° 毎フレーム描画ループ
+ */
+function renderWebGL360() {
+  if (!isWebGL360Mode || !glContext) return;
+
+  resizeWebGLCanvas();
+
+  const gl = glContext;
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  // 動画フレームのテクスチャ更新 (iOS Safari WebKit対応)
+  if (videoPlayer && videoPlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    gl.bindTexture(gl.TEXTURE_2D, glVideoTexture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoPlayer);
+      if (webglTextureStatus) {
+        webglTextureStatus.textContent = videoPlayer.paused ? '⏸ 一時停止中' : '▶️ テクスチャ更新中';
+        webglTextureStatus.style.color = '#86e49d';
+      }
+    } catch (texErr) {
+      console.warn('texImage2D error:', texErr);
+      if (webglTextureStatus) {
+        webglTextureStatus.textContent = '⚠️ テクスチャ転送エラー';
+        webglTextureStatus.style.color = '#ff8b85';
+      }
+    }
+  } else {
+    if (webglTextureStatus) {
+      webglTextureStatus.textContent = '⏳ 動画データ待機中';
+      webglTextureStatus.style.color = '#ffd182';
+    }
+  }
+
+  // 行列計算
+  const aspect = webglCanvas.width / (webglCanvas.height || 1);
+  const projMatrix = mat4Perspective(webglFov, aspect, 0.1, 100.0);
+  const viewMatrix = mat4Rotation(webglYaw, webglPitch);
+
+  gl.useProgram(glProgram);
+  gl.uniformMatrix4fv(glUniforms.uProjectionMatrix, false, projMatrix);
+  gl.uniformMatrix4fv(glUniforms.uViewMatrix, false, viewMatrix);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, glVideoTexture);
+  gl.uniform1i(glUniforms.uSampler, 0);
+
+  // 球体メッシュの描画
+  gl.drawElements(gl.TRIANGLES, glSphereIndexCount, gl.UNSIGNED_SHORT, 0);
+
+  // 次フレームの予約
+  webglAnimationFrameId = requestAnimationFrame(renderWebGL360);
+}
+
+/**
+ * カメラの視点を相対回転させる関数
+ * @param {number} dYaw - 水平回転角（度）
+ * @param {number} dPitch - 垂直回転角（度）
+ */
+function rotateWebGLCamera(dYaw, dPitch) {
+  webglYaw = (webglYaw + dYaw) % 360;
+  if (webglYaw > 180) webglYaw -= 360;
+  if (webglYaw < -180) webglYaw += 360;
+
+  webglPitch = Math.max(-85, Math.min(85, webglPitch + dPitch));
+
+  updateWebGLHud();
+}
+
+/**
+ * カメラの視点を初期位置（正面: Yaw 0°, Pitch 0°）にリセット
+ */
+function resetWebGLCamera() {
+  webglYaw = 0.0;
+  webglPitch = 0.0;
+  webglFov = 75.0;
+  updateWebGLHud();
+}
+
+/**
+ * WebGL 360° HUD表示を更新
+ */
+function updateWebGLHud() {
+  if (webglYawVal) webglYawVal.textContent = `${webglYaw.toFixed(1)}°`;
+  if (webglPitchVal) webglPitchVal.textContent = `${webglPitch.toFixed(1)}°`;
+  if (webglFovVal) webglFovVal.textContent = `${webglFov.toFixed(0)}°`;
+}
+
+/**
+ * WebGL 360° 検証モードを開始
+ */
+function enterWebGL360() {
+  if (videoPlayer.error || (!videoPlayer.src && videoPlayer.children.length === 0)) {
+    alert('動画が読み込まれていません。test.mp4を配置するか、動画ファイルを選択してください。');
+    return;
+  }
+
+  // WebGL初期化
+  const ok = initWebGL360();
+  if (!ok) return;
+
+  isWebGL360Mode = true;
+  document.documentElement.classList.add('vr-active');
+  document.body.classList.add('vr-active');
+
+  webgl360Container.style.display = 'flex';
+
+  // 動画再生
+  safePlayVideo();
+
+  // 描画ループ開始
+  if (webglAnimationFrameId) cancelAnimationFrame(webglAnimationFrameId);
+  webglAnimationFrameId = requestAnimationFrame(renderWebGL360);
+
+  updateWebGLHud();
+}
+
+/**
+ * WebGL 360° 検証モードを終了
+ */
+function exitWebGL360() {
+  isWebGL360Mode = false;
+  document.documentElement.classList.remove('vr-active');
+  document.body.classList.remove('vr-active');
+
+  webgl360Container.style.display = 'none';
+
+  if (webglAnimationFrameId) {
+    cancelAnimationFrame(webglAnimationFrameId);
+    webglAnimationFrameId = null;
+  }
+}
+
+// ============================================================
 // 初期化処理
 // ============================================================
 function initPlayer() {
@@ -597,7 +1019,7 @@ function initPlayer() {
   // ローカル動画のイベントリスナー
   videoPlayer.addEventListener('loadeddata', () => {
     if (currentSourceType === 'local') {
-      updateStatus('✅ 動画の読み込みに成功しました。再生または「2D VR MODE」を押してください。', 'success');
+      updateStatus('✅ 動画の読み込みに成功しました。再生または「2D VR MODE」「360° 球面TEST」を押してください。', 'success');
       updateCanvasDimensions();
     }
   });
@@ -627,6 +1049,21 @@ function initPlayer() {
     }
   });
 
+  // WebGL 360°画面内のファイル選択
+  if (webglFileInput) {
+    webglFileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const fileUrl = URL.createObjectURL(file);
+        videoPlayer.src = fileUrl;
+        videoPlayer.load();
+        safePlayVideo();
+        resetWebGLCamera();
+        updateStatus(`📁 360°動画「${file.name}」を読み込みました。`, 'success');
+      }
+    });
+  }
+
   // YouTube読み込みボタンのイベント
   loadYoutubeButton.addEventListener('click', () => {
     const url = youtubeUrlInput.value;
@@ -654,10 +1091,15 @@ function initPlayer() {
     }
   });
 
-  // VR開始ボタン
+  // 2D VR開始ボタン (Phase 4)
   vrButton.addEventListener('click', enterVR);
 
-  // 360° 実機検証開始ボタン
+  // Phase 7: WebGL 360° 実機検証開始ボタン
+  if (webgl360Button) {
+    webgl360Button.addEventListener('click', enterWebGL360);
+  }
+
+  // Phase 6: YouTube 360° 実機検証開始ボタン
   if (test360Button) {
     test360Button.addEventListener('click', enter360Test);
   }
@@ -674,7 +1116,7 @@ function initPlayer() {
     exitVR();
   });
 
-  // 360° 実機検証用の EXIT ボタン
+  // Phase 6: YouTube 360° 実機検証用の EXIT ボタン
   if (exit360TestButton) {
     exit360TestButton.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -682,7 +1124,40 @@ function initPlayer() {
     });
   }
 
-  // 360° 視点制御テストボタン群
+  // Phase 7: WebGL 360° 用の EXIT ボタン
+  if (exitWebgl360Button) {
+    exitWebgl360Button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exitWebGL360();
+    });
+  }
+
+  // Phase 7: WebGL 360° 視点制御ボタン群
+  if (webglBtnLeft) {
+    webglBtnLeft.addEventListener('click', () => rotateWebGLCamera(15, 0));
+  }
+  if (webglBtnRight) {
+    webglBtnRight.addEventListener('click', () => rotateWebGLCamera(-15, 0));
+  }
+  if (webglBtnUp) {
+    webglBtnUp.addEventListener('click', () => rotateWebGLCamera(0, 15));
+  }
+  if (webglBtnDown) {
+    webglBtnDown.addEventListener('click', () => rotateWebGLCamera(0, -15));
+  }
+  if (webglBtnReset) {
+    webglBtnReset.addEventListener('click', resetWebGLCamera);
+  }
+
+  // Phase 7: WebGL HUD パネル展開 / 最小化切り替え
+  if (toggleWebglHudBtn && webglHudBody) {
+    toggleWebglHudBtn.addEventListener('click', () => {
+      webglHudBody.classList.toggle('collapsed');
+      toggleWebglHudBtn.textContent = webglHudBody.classList.contains('collapsed') ? '展開' : '最小化';
+    });
+  }
+
+  // Phase 6: YouTube 360° 視点制御テストボタン群
   if (btnYawLeft) {
     btnYawLeft.addEventListener('click', () => setSphericalOffset(30, 0));
   }
@@ -699,7 +1174,7 @@ function initPlayer() {
     btnResetSpherical.addEventListener('click', resetSpherical);
   }
 
-  // HUD パネル展開 / 最小化切り替え
+  // Phase 6: HUD パネル展開 / 最小化切り替え
   if (toggleHudDetailsBtn && hudBody) {
     toggleHudDetailsBtn.addEventListener('click', () => {
       hudBody.classList.toggle('collapsed');
@@ -707,7 +1182,7 @@ function initPlayer() {
     });
   }
 
-  // ローカルVR画面タップ（再生 / 一時停止）
+  // ローカル2D VR画面タップ（再生 / 一時停止）
   vrContainer.addEventListener('click', (e) => {
     if (e.target !== exitVrButton) {
       if (videoPlayer.paused) {
@@ -726,6 +1201,26 @@ function initPlayer() {
 
   // キーボード操作（PCテスト用）
   window.addEventListener('keydown', (e) => {
+    if (isWebGL360Mode) {
+      if (e.key === 'Escape') {
+        exitWebGL360();
+        return;
+      } else if (e.key === 'ArrowLeft') {
+        rotateWebGLCamera(10, 0);
+      } else if (e.key === 'ArrowRight') {
+        rotateWebGLCamera(-10, 0);
+      } else if (e.key === 'ArrowUp') {
+        rotateWebGLCamera(0, 10);
+      } else if (e.key === 'ArrowDown') {
+        rotateWebGLCamera(0, -10);
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        if (videoPlayer.paused) safePlayVideo();
+        else videoPlayer.pause();
+      }
+      return;
+    }
+
     if (is360TestMode && e.key === 'Escape') {
       exit360Test();
       return;
@@ -752,6 +1247,9 @@ function initPlayer() {
     if (isVRMode && currentSourceType === 'local') {
       updateCanvasDimensions();
     }
+    if (isWebGL360Mode) {
+      resizeWebGLCanvas();
+    }
   });
 
   window.addEventListener('orientationchange', () => {
@@ -759,12 +1257,15 @@ function initPlayer() {
       if (isVRMode && currentSourceType === 'local') {
         updateCanvasDimensions();
       }
+      if (isWebGL360Mode) {
+        resizeWebGLCanvas();
+      }
     }, 200);
   });
 
-  // VRモード中のスクロール完全抑止
+  // VR / 360モード中のスクロール完全抑止
   window.addEventListener('touchmove', (e) => {
-    if (isVRMode || is360TestMode) {
+    if (isVRMode || is360TestMode || isWebGL360Mode) {
       e.preventDefault();
     }
   }, { passive: false });
@@ -776,9 +1277,16 @@ function initPlayer() {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
       }
+      if (webglAnimationFrameId) {
+        cancelAnimationFrame(webglAnimationFrameId);
+        webglAnimationFrameId = null;
+      }
     } else {
       if (isVRMode && currentSourceType === 'local' && !animationFrameId) {
         animationFrameId = requestAnimationFrame(renderVRFrame);
+      }
+      if (isWebGL360Mode && !webglAnimationFrameId) {
+        webglAnimationFrameId = requestAnimationFrame(renderWebGL360);
       }
     }
   });

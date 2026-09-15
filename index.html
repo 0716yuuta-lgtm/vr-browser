@@ -133,8 +133,13 @@
         <button id="vrButton" class="vr-button" type="button">
           🥽 VR MODE
         </button>
+        <!-- Phase 7: WebGL 自前360°球面テストボタン（ローカル動画用） -->
+        <button id="webgl360Button" class="webgl360-button" type="button">
+          🌐 360° 球面TEST (WebGL)
+        </button>
+        <!-- Phase 6: YouTube 360°テストボタン（YouTube動画選択時） -->
         <button id="test360Button" class="test360-button" type="button" style="display: none;">
-          🧭 360° TEST（実機検証）
+          🧭 360° TEST (YouTube)
         </button>
       </div>
 
@@ -191,6 +196,75 @@
       <div class="vr-bottom-bar">
         <div class="vr-tap-hint">
           画面タップ: 再生 / 一時停止
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【Phase 7】WebGL 360°球面動画検証画面（単一画面オーバーレイ） -->
+  <div id="webgl360Container" class="webgl-360-container" style="display: none;">
+    <!-- WebGL 描画用 Canvas -->
+    <canvas id="webglCanvas"></canvas>
+
+    <!-- WebGL 360°用 UI・HUD レイヤー -->
+    <div class="webgl-ui-layer" id="webglUiLayer">
+      <!-- 上部バー -->
+      <div class="webgl-top-bar">
+        <button id="exitWebgl360Button" class="exit-vr-button" type="button" aria-label="360°テストを終了">
+          ✕ EXIT 360° TEST
+        </button>
+        <span class="webgl-badge">Phase 7 WebGL 360°</span>
+      </div>
+
+      <!-- HUD操作パネル -->
+      <div class="webgl-hud-panel" id="webglHudPanel">
+        <div class="hud-header">
+          <span class="hud-title">🌐 WebGL 球面投影ステータス</span>
+          <button id="toggleWebglHudBtn" class="hud-toggle-btn" type="button">最小化</button>
+        </div>
+        <div class="hud-body" id="webglHudBody">
+          <!-- 角度表示 -->
+          <div class="hud-props-grid">
+            <div class="prop-item">
+              <span class="prop-name">Yaw (水平):</span>
+              <span class="prop-val" id="webglYawVal">0.0°</span>
+            </div>
+            <div class="prop-item">
+              <span class="prop-name">Pitch (垂直):</span>
+              <span class="prop-val" id="webglPitchVal">0.0°</span>
+            </div>
+            <div class="prop-item">
+              <span class="prop-name">FOV (視野角):</span>
+              <span class="prop-val" id="webglFovVal">75°</span>
+            </div>
+            <div class="prop-item">
+              <span class="prop-name">テクスチャ:</span>
+              <span class="prop-val" id="webglTextureStatus">初期化中...</span>
+            </div>
+          </div>
+
+          <!-- 視点制御ボタン -->
+          <div class="hud-controls">
+            <div class="control-label">視点コントロール:</div>
+            <div class="control-buttons">
+              <button id="webglBtnLeft" class="control-btn" type="button">⬅️ 左</button>
+              <button id="webglBtnUp" class="control-btn" type="button">⬆️ 上</button>
+              <button id="webglBtnDown" class="control-btn" type="button">⬇️ 下</button>
+              <button id="webglBtnRight" class="control-btn" type="button">➡️ 右</button>
+              <button id="webglBtnReset" class="control-btn reset-btn" type="button">🔄 RESET VIEW</button>
+            </div>
+          </div>
+
+          <!-- 2D動画についての案内 & ファイル選択 -->
+          <div class="hud-notice">
+            <p class="notice-text">
+              ⚠️ 通常の2D動画（test.mp4等）は球面に引き伸ばされて歪みます。360°Equirectangular形式の動画ファイルを選択すると全方位パノラマとして正常に表示されます。
+            </p>
+            <label for="webglFileInput" class="webgl-file-label">
+              📁 360°動画ファイルを選択
+            </label>
+            <input type="file" id="webglFileInput" accept="video/*" class="file-input">
+          </div>
         </div>
       </div>
     </div>
