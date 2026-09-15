@@ -1,6 +1,9 @@
 /* ============================================================
-   基本スタイル設定
+   VR Browser - 2D VR 専用プレイヤー スタイルシート
+   （Single Canvas 50:50 アトミック描画 & requestVideoFrameCallback 対応）
    ============================================================ */
+
+/* リセット & 基本設定 */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -107,9 +110,8 @@ body {
   border: none;
 }
 
-/* YouTube VR / 360° TEST モード時の全画面スタイル */
-.youtube-container.vr-fullscreen,
-.youtube-container.test360-fullscreen {
+/* YouTube VRモード時の全画面スタイル */
+.youtube-container.vr-fullscreen {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -136,217 +138,6 @@ body {
   left: max(16px, env(safe-area-inset-left));
   z-index: 100000;
   pointer-events: auto;
-}
-
-/* ============================================================
-   Phase 6: YouTube 360° 実機検証UIレイヤー & HUDパネル
-   ============================================================ */
-.test360-ui-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 14px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 14px);
-  pointer-events: none;
-  z-index: 100000;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-sizing: border-box;
-}
-
-.test360-top-bar {
-  pointer-events: auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.test360-badge {
-  background: rgba(0, 180, 216, 0.25);
-  color: #90e0ef;
-  border: 1px solid rgba(0, 180, 216, 0.5);
-  border-radius: 12px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.test360-hud-panel {
-  pointer-events: auto;
-  background: rgba(18, 18, 18, 0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  padding: 12px 14px;
-  max-width: 440px;
-  width: 100%;
-  margin: 0 auto;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.8);
-  max-height: calc(100dvh - 90px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.hud-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.hud-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #00b4d8;
-  letter-spacing: 0.3px;
-}
-
-.hud-toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 4px;
-  color: #cccccc;
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.hud-body.collapsed {
-  display: none;
-}
-
-.hud-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.75rem;
-  margin-bottom: 6px;
-  padding: 4px 6px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-}
-
-.hud-label {
-  color: #aaaaaa;
-  font-weight: 600;
-}
-
-.hud-val {
-  color: #86e49d;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.hud-props-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.prop-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.75rem;
-}
-
-.prop-name {
-  color: #888888;
-}
-
-.prop-val {
-  color: #48cae4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 700;
-}
-
-.hud-controls {
-  margin-top: 10px;
-}
-
-.control-label {
-  font-size: 0.73rem;
-  color: #cccccc;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.control-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.control-btn {
-  flex: 1 1 calc(20% - 6px);
-  min-width: 55px;
-  padding: 6px 4px;
-  background: #282828;
-  border: 1px solid #444444;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: center;
-  transition: background 0.15s, transform 0.1s;
-  touch-action: manipulation;
-}
-
-.control-btn:hover {
-  background: #383838;
-}
-
-.control-btn:active {
-  background: #0077b6;
-  transform: scale(0.96);
-}
-
-.control-btn.reset-btn {
-  flex: 1 1 100%;
-  background: rgba(230, 33, 23, 0.25);
-  border-color: rgba(230, 33, 23, 0.5);
-  color: #ff8b85;
-}
-
-.control-btn.reset-btn:hover {
-  background: rgba(230, 33, 23, 0.4);
-}
-
-.hud-checklist {
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 8px;
-}
-
-.checklist-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #ffb703;
-  margin-bottom: 4px;
-}
-
-.hud-checklist ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.hud-checklist li {
-  font-size: 0.68rem;
-  color: #bbbbbb;
-  line-height: 1.4;
-  margin-bottom: 2px;
 }
 
 /* YouTube URL入力セクション */
@@ -412,34 +203,7 @@ body {
   transform: scale(0.97);
 }
 
-/* サンプルURLボタン */
-.sample-url-row {
-  margin-top: 4px;
-  display: flex;
-}
-
-.sample-url-button {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px dashed #555555;
-  color: #64b5f6;
-  font-size: 0.8rem;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  touch-action: manipulation;
-}
-
-.sample-url-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #64b5f6;
-}
-
-.sample-url-button:active {
-  transform: scale(0.97);
-}
-
-/* VRモード & 360°検証ボタンセクション */
+/* VRモードボタンセクション */
 .vr-button-section {
   width: 100%;
   display: flex;
@@ -478,57 +242,6 @@ body {
   color: #777777;
   cursor: not-allowed;
   box-shadow: none;
-  transform: none;
-}
-
-.webgl360-button {
-  width: 100%;
-  padding: 13px 20px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
-  letter-spacing: 0.5px;
-  touch-action: manipulation;
-}
-
-.webgl360-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.55);
-}
-
-.webgl360-button:active {
-  transform: translateY(0);
-}
-
-.test360-button {
-  width: 100%;
-  padding: 12px 20px;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.35);
-  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
-  letter-spacing: 0.5px;
-  touch-action: manipulation;
-}
-
-.test360-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 180, 216, 0.55);
-}
-
-.test360-button:active {
-  transform: translateY(0);
 }
 
 /* ステータス・案内メッセージ */
@@ -593,7 +306,7 @@ body {
 }
 
 /* ============================================================
-   Phase 4: 2D VR視聴画面レイアウト（ローカル動画用 左右2画面）
+   2D VR視聴画面レイアウト（単一全画面Canvas 左右50:50 アトミック同期）
    ============================================================ */
 
 /* VRモード有効時のスクロール完全抑止（iOS Safariバウンススクロール対策） */
@@ -625,7 +338,6 @@ body.vr-active {
   background-color: #000000;
   z-index: 99999;
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -635,39 +347,29 @@ body.vr-active {
   touch-action: none;
 }
 
-/* 左目・右目の表示領域（WebKit Flexboxで厳密に左右50:50を維持） */
-.vr-eye {
-  flex: 1 1 0;
-  width: 50%;
-  min-width: 0;
-  max-width: 50%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-color: #000000;
-  position: relative;
-}
-
-/* 描画用Canvas（縦横比を崩さず、画面からはみ出さない・Retina高精細縮小） */
-.vr-eye canvas {
+/* 単一全画面マスターCanvas（左50%・右50%を同一フレームでアトミック描画） */
+#vrCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
   display: block;
   background-color: #000000;
 }
 
 /* 左右の境界線（VRゴーグルのレンズ境界ガイド用センターライン） */
 .vr-divider {
+  position: absolute;
+  top: 0;
+  left: 50%;
   width: 1px;
   height: 100%;
   background-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(-50%);
   flex-shrink: 0;
   z-index: 10;
+  pointer-events: none;
 }
 
 /* VRモード用UIレイヤー（画面上に重なる操作UI） */
@@ -695,8 +397,22 @@ body.vr-active {
 .vr-top-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   width: 100%;
+}
+
+/* VR同期ステータスバッジ */
+.vr-sync-badge {
+  background: rgba(0, 112, 243, 0.25);
+  color: #8ec5fc;
+  border: 1px solid rgba(0, 112, 243, 0.4);
+  border-radius: 12px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.3px;
+  pointer-events: none;
 }
 
 /* EXIT VR ボタン */
@@ -743,8 +459,10 @@ body.vr-active {
 /* 下部バー */
 .vr-bottom-bar {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
+  gap: 4px;
 }
 
 .vr-tap-hint {
@@ -758,6 +476,15 @@ body.vr-active {
   pointer-events: none;
 }
 
+/* VRデバッグ情報テキスト */
+.vr-debug-info {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* 横向き（Landscape）時は縦向き案内を自動で非表示 */
 @media (orientation: landscape) {
   .vr-portrait-hint {
@@ -765,7 +492,7 @@ body.vr-active {
   }
 }
 
-/* VR画面中央の再生/一時停止HUDインジケーター */
+/* VR画面の再生/一時停止HUDインジケーター（左目: 25%、右目: 75%） */
 .vr-indicator {
   position: absolute;
   width: 50px;
@@ -780,129 +507,27 @@ body.vr-active {
   color: #ffffff;
   opacity: 0;
   pointer-events: none;
-  transform: scale(0.8);
   transition: opacity 0.25s ease, transform 0.25s ease;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 15;
 }
 
-/* インジケーター表示時 */
+.vr-indicator.left-indicator {
+  left: 25%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.vr-indicator.right-indicator {
+  left: 75%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* インジケーター表示時（active / show） */
+.vr-indicator.active,
 .vr-indicator.show {
   opacity: 1;
-  transform: scale(1);
-}
-
-/* ============================================================
-   Phase 7: WebGL 360° 球面動画ビューワースタイル
-   ============================================================ */
-.webgl-360-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  width: 100dvw;
-  height: 100dvh;
-  background-color: #000000;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-}
-
-#webglCanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  background-color: #000000;
-}
-
-.webgl-ui-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 14px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 14px);
-  pointer-events: none;
-  z-index: 100000;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-sizing: border-box;
-}
-
-.webgl-top-bar {
-  pointer-events: auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.webgl-badge {
-  background: rgba(16, 185, 129, 0.25);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.5);
-  border-radius: 12px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.webgl-hud-panel {
-  pointer-events: auto;
-  background: rgba(18, 18, 18, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  padding: 12px 14px;
-  max-width: 440px;
-  width: 100%;
-  margin: 0 auto;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.8);
-  max-height: calc(100dvh - 80px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.hud-notice {
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 8px;
-}
-
-.notice-text {
-  font-size: 0.72rem;
-  color: #ffb703;
-  line-height: 1.4;
-  margin-bottom: 8px;
-}
-
-.webgl-file-label {
-  display: inline-block;
-  padding: 7px 14px;
-  background: #2a2a2a;
-  border: 1px solid #555555;
-  border-radius: 6px;
-  color: #e0e0e0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-  touch-action: manipulation;
-}
-
-.webgl-file-label:hover {
-  background: #3a3a3a;
-  border-color: #10b981;
+  transform: translate(-50%, -50%) scale(1);
 }
